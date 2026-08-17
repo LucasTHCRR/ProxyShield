@@ -1,0 +1,153 @@
+# ============================================================================
+#  ProxyShield v2.0  -  Anti-VPN / Anti-Proxy
+#  Paper - Folia - BungeeCord - Velocity - Sponge
+#
+#  Every option below behaves identically on all five platforms.
+#  After editing run:  /proxyshield reload
+# ============================================================================
+
+settings:
+  # Which message file to use. "en" loads messages_en.yml, "de" loads messages_de.yml.
+  # Both ship with the plugin. To add your own, copy one of them to messages_<code>.yml
+  # and point this at <code>. All player facing text lives in those files, not here.
+  language: "en"
+
+  # What to do when a check cannot complete (provider down, rate limit, timeout).
+  #   false = let the player in  (recommended)
+  #   true  = deny the connection
+  fail-closed: false
+
+  # Players with this permission skip every check.
+  bypass-permission: "proxyshield.bypass"
+
+detection:
+  # Detect and report, but never actually kick. Use this to hunt false positives
+  # before you switch enforcement on.
+  dry-run: false
+
+  # Block addresses the provider flags as a proxy, VPN or Tor exit.
+  block-proxy: true
+
+  # Block datacenter and hosting ranges. These are where most bots come from,
+  # but a few mobile carriers get flagged too, so watch your logs at first.
+  block-hosting: true
+
+  # Check the downloaded IP lists below.
+  use-lists: true
+
+  # Query the online provider under "api".
+  use-api: true
+
+  # Re-check everyone already online whenever the config is reloaded, and kick
+  # whoever no longer passes. You can also trigger this any time with
+  # /proxyshield recheck
+  recheck-online-on-reload: false
+
+country:
+  # Country filtering needs "use-api" data, so the provider is queried even when
+  # detection.use-api is off.
+  enabled: false
+
+  # blacklist = block the countries listed here
+  # whitelist = allow ONLY the countries listed here
+  mode: blacklist
+
+  # ISO 3166-1 alpha-2 codes, e.g. DE, AT, CH, US, GB
+  codes:
+    - "KP"
+
+  # Block when the country cannot be determined at all.
+  block-unknown: false
+
+whitelist:
+  # Never blocked. Accepts a single address, a CIDR block or a start-end range,
+  # in IPv4 or IPv6. Add more in game with /proxyshield whitelist add <entry>
+  ips:
+    - "127.0.0.1"
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
+    - "192.168.0.0/16"
+
+  # Never blocked, by name (case insensitive).
+  players: []
+
+blacklist:
+  # Always blocked, checked before the lists and the provider.
+  ips: []
+
+lists:
+  # How often the feeds are re-downloaded.
+  update-interval-hours: 24
+
+  # Keep a copy on disk so a restart is protected even if the feed host is down.
+  disk-cache: true
+
+  # Per source connect and read timeout.
+  timeout-seconds: 20
+
+  # Plain text feeds of addresses, CIDR blocks or ranges. Comments and trailing
+  # text are ignored, so most public lists work as-is.
+  #
+  # The two "vpn" feeds are actual VPN exit ranges. The two "datacenter" feeds are
+  # hosting ranges, which catch far more bots but occasionally also catch a mobile
+  # carrier. Drop the datacenter lines if you see false positives.
+  # Remove the ipv6 lines if your server does not accept IPv6 connections.
+  sources:
+    - "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/vpn/ipv4.txt"
+    - "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/vpn/ipv6.txt"
+    - "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/datacenter/ipv4.txt"
+    - "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/datacenter/ipv6.txt"
+
+api:
+  # {ip} is replaced with the address being checked. The response is read as JSON;
+  # the fields status, message, proxy, hosting, countryCode, country and isp are used.
+  # ip-api.com only serves HTTPS on paid plans, hence the http:// default.
+  url: "http://ip-api.com/json/{ip}?fields=status,message,proxy,hosting,countryCode,country,isp"
+
+  timeout-seconds: 5
+
+  # How long a provider answer stays cached.
+  cache-minutes: 360
+
+  # Upper bound on cached addresses. Least recently used entries are evicted.
+  max-cache-entries: 10000
+
+  # ip-api.com allows 45 requests per minute on the free tier. Requests beyond
+  # this are skipped rather than sent, so the provider does not ban the server.
+  rate-limit-per-minute: 45
+
+notifications:
+  # Silent mode: no staff broadcast and no console line. The log file and the
+  # Discord webhook still record everything.
+  silent: false
+
+  # Print alerts to the server console.
+  console: true
+
+  # Staff with this permission see live alerts.
+  permission: "proxyshield.notify"
+
+  # Append every detection to plugins/ProxyShield/blocks.log
+  log-file: true
+
+discord:
+  enabled: false
+
+  # Must start with https://
+  webhook-url: ""
+
+  # Set to false to print "hidden" instead of the address.
+  show-ip: true
+
+  username: "ProxyShield"
+  title: "ProxyShield Alert"
+
+  # Embed colour as a decimal number. 16711680 = red, 16753920 = orange.
+  color: 16711680
+
+# ============================================================================
+#  Permissions
+#    proxyshield.bypass  - skip all checks
+#    proxyshield.notify  - receive live block alerts
+#    proxyshield.admin   - use /proxyshield
+# ============================================================================

@@ -1,0 +1,5 @@
+name: ProxyShield
+version: 1.0
+main: de.lucasthcr.bridgesave.proxyShield.BungeeMain
+author: LucasTHCR
+description: Hybrides Anti-VPN System.

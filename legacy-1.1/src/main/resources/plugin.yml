@@ -1,0 +1,11 @@
+name: ProxyShield
+version: 1.0
+main: de.lucasthcr.bridgesave.proxyShield.PaperMain
+api-version: 1.21
+author: LucasTHCR
+website: https://dc.gg/лукас
+description: Ein hybrides Anti-VPN System für Paper, Bungee und Velocity.
+permissions:
+  proxyshield.notify:
+    description: Erlaubt es, Benachrichtigungen bei VPN-Logins zu erhalten.
+    default: op

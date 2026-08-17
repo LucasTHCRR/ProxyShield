@@ -1,0 +1,32 @@
+{
+  "loader": {
+    "name": "java_plain",
+    "version": "1.0"
+  },
+  "license": "GPL-3.0",
+  "global": {
+    "version": "${project.version}",
+    "links": {
+      "homepage": "https://modrinth.com/plugin/proxyshield"
+    },
+    "contributors": [
+      {
+        "name": "LucasTHCR"
+      }
+    ],
+    "dependencies": [
+      {
+        "id": "spongeapi",
+        "version": "17.0.0"
+      }
+    ]
+  },
+  "plugins": [
+    {
+      "id": "proxyshield",
+      "name": "ProxyShield",
+      "entrypoint": "de.lucasthcr.bridgesave.proxyshield.sponge.SpongeMain",
+      "description": "Anti-VPN and anti-proxy protection with country filtering, webhook alerts and a silent mode."
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+package de.lucasthcr.bridgesave.proxyshield.velocity;
+
+import com.google.inject.Inject;
+import com.velocitypowered.api.command.CommandManager;
+import com.velocitypowered.api.command.CommandMeta;
+import com.velocitypowered.api.command.SimpleCommand;
+import com.velocitypowered.api.event.EventTask;
+import com.velocitypowered.api.event.ResultedEvent;
+import com.velocitypowered.api.event.Subscribe;
+import com.velocitypowered.api.event.connection.LoginEvent;
+import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
+import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
+import com.velocitypowered.api.plugin.Plugin;
+import com.velocitypowered.api.plugin.annotation.DataDirectory;
+import com.velocitypowered.api.proxy.Player;
+import com.velocitypowered.api.proxy.ProxyServer;
+import de.lucasthcr.bridgesave.proxyshield.ProxyShieldCore;
+import de.lucasthcr.bridgesave.proxyshield.command.CommandHandler;
+import java.net.InetSocketAddress;
+import java.nio.file.Path;
+import java.util.List;
+import org.slf4j.Logger;
+
+/**
+ * Velocity entry point.
+ * <p>
+ * The check runs from an {@link EventTask#async} continuation on {@link LoginEvent}, so the
+ * connection is denied before the player reaches a backend server. v1 used {@code PostLoginEvent}
+ * and kicked afterwards, which meant a blocked player was briefly fully connected.
+ */
+@Plugin(
+      id = "proxyshield",
+      name = "ProxyShield",
+      // Keep in sync with the version in pom.xml; annotation values must be compile-time constants.
+      version = VelocityMain.VERSION,
+      description = "Anti-VPN and anti-proxy protection with country filtering and webhook alerts.",
+      authors = {"LucasTHCR"}
+)
+public final class VelocityMain {
+
+   public static final String VERSION = "2.0";
+
+   private final ProxyServer server;
+   private final Logger logger;
+   private final Path dataDirectory;
+
+   private ProxyShieldCore core;
+   private CommandHandler commands;
+
+   @Inject
+   public VelocityMain(ProxyServer server, Logger logger, @DataDirectory Path dataDirectory) {
+      this.server = server;
+      this.logger = logger;
+      this.dataDirectory = dataDirectory;
+   }
+
+   @Subscribe
+   public void onInit(ProxyInitializeEvent event) {
+      core = new ProxyShieldCore(new VelocityPlatform(this, server, logger, dataDirectory));
+      core.start();
+      commands = new CommandHandler(core);
+
+      CommandManager manager = server.getCommandManager();
+      CommandMeta meta = manager.metaBuilder("proxyshield")
+            .aliases("ps", "antivpn")
+            .plugin(this)
+            .build();
+      manager.register(meta, new ShieldCommand());
+   }
+
+   @Subscribe
+   public void onShutdown(ProxyShutdownEvent event) {
+      if (core != null) {
+         core.shutdown();
+      }
+   }
+
+   @Subscribe
+   public EventTask onLogin(LoginEvent event) {
+      Player player = event.getPlayer();
+      InetSocketAddress address = player.getRemoteAddress();
+      String ip = address == null || address.getAddress() == null
+            ? null
+            : address.getAddress().getHostAddress();
+
+      return EventTask.async(() -> {
+         ProxyShieldCore.ConnectionDecision decision = core.handleLogin(
+               player.getUsername(), ip, player::hasPermission);
+         if (decision.deny()) {
+            event.setResult(ResultedEvent.ComponentResult.denied(
+                  VelocityPlatform.color(decision.kickMessage())));
+         }
+      });
+   }
+
+   private final class ShieldCommand implements SimpleCommand {
+
+      @Override
+      public void execute(Invocation invocation) {
+         commands.execute(wrap(invocation), invocation.arguments());
+      }
+
+      @Override
+      public List<String> suggest(Invocation invocation) {
+         return commands.tabComplete(wrap(invocation), invocation.arguments());
+      }
+
+      @Override
+      public boolean hasPermission(Invocation invocation) {
+         return invocation.source().hasPermission(CommandHandler.PERMISSION);
+      }
+
+      private CommandHandler.Sender wrap(Invocation invocation) {
+         return new CommandHandler.Sender() {
+            @Override
+            public void send(String legacyMessage) {
+               invocation.source().sendMessage(VelocityPlatform.color(legacyMessage));
+            }
+
+            @Override
+            public boolean hasPermission(String permission) {
+               return invocation.source().hasPermission(permission);
+            }
+         };
+      }
+   }
+}

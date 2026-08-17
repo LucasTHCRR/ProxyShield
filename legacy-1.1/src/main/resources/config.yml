@@ -1,0 +1,34 @@
+# 🛡️ ProxyShield v1.1 - Configuration
+# Developed by LucasTHCR
+# Support & Updates: https://dc.gg/лукас
+
+settings:
+  # The message shown to the player when they are kicked
+  kick-message: "&c&lProxyShield &8» &7VPNs/Proxies are not allowed on this server! Please disable your VPN to join."
+
+  # How often the VPN lists should be updated (in hours)
+  update-interval-hours: 24
+
+# List of IP addresses that the plugin should ignore (e.g., your own IP)
+whitelist:
+  - "127.0.0.1"
+
+# Sources for the VPN lists (Text files containing IP networks/subnets)
+sources:
+  - "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/ipv4.txt"
+
+discord:
+  # Should a notification be sent to Discord?
+  enabled: false
+
+  # Insert your Discord Webhook URL here
+  webhook-url: ""
+
+  # Should the blocked player's IP be shown in the Discord message?
+  show-ip: true
+
+  # The title of the Discord Embed message
+  message-title: "🛡️ ProxyShield Alert"
+
+# Permissions:
+# proxyshield.notify - Allows players/staff to see VPN block alerts in chat

@@ -1,0 +1,39 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      - name: Build and test
+        run: mvn -B --no-transfer-progress clean package
+
+      - name: Upload plugin jars
+        uses: actions/upload-artifact@v4
+        with:
+          name: proxyshield-jars
+          path: proxyshield-*/target/ProxyShield-*.jar
+          if-no-files-found: error
+
+      - name: Upload test report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: proxyshield-common/target/surefire-reports/
+          if-no-files-found: ignore

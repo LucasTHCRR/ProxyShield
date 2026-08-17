@@ -1,0 +1,141 @@
+# ============================================================================
+#  ProxyShield - English messages
+#
+#  Every line supports & colour codes. {prefix} inserts the prefix below.
+#  Placeholders in curly braces are filled in by the plugin. Dropping one is
+#  fine; an unknown one is simply printed as written.
+#
+#  Any key you delete falls back to the built-in English text, so a file from
+#  an older version keeps working after an update.
+#
+#  To add a language: copy this file to messages_<code>.yml, translate it and
+#  set settings.language to <code> in config.yml.
+# ============================================================================
+
+# --- Prefix, inserted wherever {prefix} appears ---
+prefix: "&8[&cProxyShield&8]&r "
+
+# --- Block alerts shown to staff and written to the console ---
+alert: "{prefix}&e{player} &7blocked &8(&f{reason}&8) &7from &f{ip} &8[&f{country}&8]"
+alert-dry-run: "{prefix}&6[DRY-RUN] &e{player} &7would be blocked &8(&f{reason}&8) &7from &f{ip}"
+
+# --- Shown to the blocked player on the disconnect screen ---
+kick-message: "&c&lProxyShield&r\\n\\n&7VPNs and proxies are not allowed on this server.\\n&7Reason: &f{reason}"
+
+# --- Errors ---
+no-permission: "{prefix}&cYou do not have permission to use this command."
+unknown-subcommand: "{prefix}&cUnknown subcommand &f{input}&c."
+player-not-found: "{prefix}&cNo online player named &f{input} &cand not a valid IP."
+invalid-entry: "{prefix}&cNot a valid address, CIDR block or range: &f{input}"
+
+# --- /proxyshield help ---
+help-header: "&8&m--------&r &c&lProxyShield &7v{version} &8&m--------"
+help-info: "&e/proxyshield info &8- &7Version and current mode"
+help-stats: "&e/proxyshield stats &8- &7Detection counters"
+help-check: "&e/proxyshield check <player|ip> &8- &7Run the full pipeline"
+help-lookup: "&e/proxyshield lookup <ip> &8- &7Fresh provider lookup"
+help-whitelist: "&e/proxyshield whitelist <add|remove|list> [ip] &8- &7Never block"
+help-blacklist: "&e/proxyshield blacklist <add|remove|list> [ip] &8- &7Always block"
+help-refresh: "&e/proxyshield refresh &8- &7Re-download the VPN lists"
+help-recheck: "&e/proxyshield recheck &8- &7Re-check everyone online"
+help-clearcache: "&e/proxyshield clearcache &8- &7Drop cached lookup results"
+help-reload: "&e/proxyshield reload &8- &7Re-read config.yml"
+help-footer: "&7Entries accept a single IP, a CIDR block or a range."
+
+# --- /proxyshield info ---
+info-header: "&8&m--------&r &c&lProxyShield &8&m--------"
+info-version: "&7Version: &f{version} &8| &7Platform: &f{platform} &8| &7Language: &f{locale}"
+info-mode-enforcing: "&7Mode: &aenforcing"
+info-mode-dry-run: "&7Mode: &6dry-run (nobody is kicked)"
+info-alerts: "&7Alerts: {silent} &8| &7Webhook: {webhook} &8| &7Log file: {logfile}"
+info-detection: "&7Detection: &flists={lists} &fapi={api} &fproxy={proxy} &fhosting={hosting}"
+info-country-off: "&7Country filter: &7off"
+info-country-on: "&7Country filter: &f{mode} &8[&f{codes}&8] &7unknown={unknown}"
+info-lists: "&7VPN ranges: &f{ranges} &7from &f{ok}&7/&f{total} &7source(s)"
+info-managed: "&7Whitelist: &f{whitelist} &8| &7Blacklist: &f{blacklist} &7range(s)"
+info-provider: "&7Provider: &f{provider} &8| &7Fail policy: {failmode}"
+
+# --- /proxyshield stats ---
+stats-header: "&8&m--------&r &c&lProxyShield Stats &8&m--------"
+stats-uptime: "&7Uptime: &f{uptime}"
+stats-checked: "&7Connections checked: &f{checked}"
+stats-blocked: "&7Blocked: &c{blocked}{dryrun}"
+stats-reasons-1: "&7 &8• &7List: &f{list} &8• &7Proxy: &f{proxy} &8• &7Hosting: &f{hosting}"
+stats-reasons-2: "&7 &8• &7Country: &f{country} &8• &7Blacklist: &f{blacklist} &8• &7Failed: &f{failed}"
+stats-allowed: "&7Allowed by bypass: &f{bypass} &8• &7by whitelist: &f{whitelist}"
+stats-lookups: "&7Lookups: &f{lookups} &8| &7cache: &f{cachesize}&7, &f{cachehits} &7hits &8| &7limited: &f{limited} &8| &7failed: &f{failed}"
+stats-webhook: "&7Webhook: &f{sent} &7sent, &f{dropped} &7dropped, &f{queued} &7queued"
+
+# --- /proxyshield reload ---
+reload-success: "{prefix}&aConfiguration reloaded. Lists are refreshing."
+reload-dry-run: "{prefix}&6Dry-run is enabled, detections will not kick anybody."
+reload-failed: "{prefix}&cReload failed: &f{error}"
+reload-kept: "&7The previous configuration is still active."
+
+# --- /proxyshield refresh ---
+refresh-running: "{prefix}&eA list refresh is already running."
+refresh-start: "{prefix}&7Downloading VPN lists…"
+refresh-done: "{prefix}&aLists updated: &f{ranges} &aranges, &f{addresses} &aaddresses."
+refresh-failed: "{prefix}&cRefresh failed: &f{error}"
+
+# --- /proxyshield recheck ---
+recheck-start: "{prefix}&7Re-checking every online player…"
+recheck-done: "{prefix}&aRecheck finished, &f{count} &aplayer(s) disconnected."
+recheck-dry-run: "{prefix}&aRecheck finished. &6Dry-run is on, nobody was disconnected."
+
+# --- /proxyshield clearcache ---
+cache-cleared: "{prefix}&aDropped &f{count} &acached lookup result(s)."
+
+# --- /proxyshield check ---
+check-start: "{prefix}&7Checking &f{ip}&7…"
+check-header: "&8&m--------&r &c&lProxyShield Check &8&m--------"
+check-target: "&7Target: &f{target} &8(&f{ip}&8)"
+check-verdict-allowed: "&7Verdict: &aALLOWED &8- &f{reason}"
+check-verdict-blocked: "&7Verdict: &cBLOCKED &8- &f{reason}"
+check-country: "&7Country: &f{code} &8(&f{name}&8)"
+check-isp: "&7ISP: &f{isp}"
+check-flags: "&7Proxy: {proxy} &8| &7Hosting: {hosting}"
+check-unresolved: "&7Provider data: &7unavailable &8(&f{error}&8)"
+check-lists: "&7On list: {list} &8| &7Whitelisted: {whitelist} &8| &7Blacklisted: {blacklist}"
+check-dry-run-note: "&6Dry-run is on, so this player would still be let through."
+
+# --- /proxyshield lookup ---
+lookup-start: "{prefix}&7Querying the provider for &f{ip}&7…"
+lookup-failed: "{prefix}&cLookup failed: &f{error}"
+lookup-result: "&7{ip} &8→ &7country &f{country} &8| &7proxy {proxy} &8| &7hosting {hosting} &8| &7isp &f{isp}"
+
+# --- /proxyshield whitelist and blacklist ---
+list-header: "&8&m--------&r &c&l{list} &8&m--------"
+list-config: "&7From config.yml &8(&f{count}&8): &f{entries}"
+list-runtime: "&7Added in game &8(&f{count}&8): &f{entries}"
+list-ranges: "&7Covering &f{count} &7merged range(s)."
+list-empty: "none"
+list-added: "{prefix}&aAdded &f{entry} &ato the {list}."
+list-already: "{prefix}&e{entry} &7is already on the {list}."
+list-removed: "{prefix}&aRemoved &f{entry} &afrom the {list}."
+list-not-runtime: "{prefix}&c{entry} &7is not an in-game entry. Remove config entries in config.yml."
+list-save-failed: "{prefix}&cCould not save the {list}: &f{error}"
+list-usage: "{prefix}&cUsage: &f/proxyshield {list} <add|remove|list> [ip]"
+
+# --- Usage hints ---
+usage-check: "{prefix}&cUsage: &f/proxyshield check <player|ip>"
+usage-lookup: "{prefix}&cUsage: &f/proxyshield lookup <player|ip>"
+
+# --- Toggle hints ---
+toggle-state: "&7{key} is currently {state}&7."
+toggle-hint: "&7Change it in config.yml and run &f/proxyshield reload&7."
+
+# --- Update notice ---
+update-available: "{prefix}&eProxyShield &f{latest} &eis available, you are running &f{current}&e."
+
+# --- Reusable words, referenced from the lines above ---
+word-yes: "&cyes"
+word-no: "&ano"
+word-on: "&aon"
+word-off: "&coff"
+enabled: "&aenabled"
+disabled: "&cdisabled"
+silent-mode: "&6silent"
+broadcast-mode: "&abroadcast"
+fail-open: "&afail-open (allow on error)"
+fail-closed: "&6fail-closed (deny on error)"

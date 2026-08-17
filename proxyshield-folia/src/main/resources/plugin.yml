@@ -1,0 +1,25 @@
+name: ProxyShield
+version: ${project.version}
+main: de.lucasthcr.bridgesave.proxyshield.paper.PaperMain
+api-version: '1.21'
+author: LucasTHCR
+description: Anti-VPN and anti-proxy protection for Folia, with country filtering, webhook alerts and a silent mode.
+folia-supported: true
+
+commands:
+  proxyshield:
+    description: Manage ProxyShield.
+    usage: /proxyshield help
+    aliases: [ps, antivpn]
+    permission: proxyshield.admin
+
+permissions:
+  proxyshield.bypass:
+    description: Skips every ProxyShield check.
+    default: op
+  proxyshield.notify:
+    description: Receives live alerts when a connection is blocked.
+    default: op
+  proxyshield.admin:
+    description: Allows use of /proxyshield.
+    default: op
