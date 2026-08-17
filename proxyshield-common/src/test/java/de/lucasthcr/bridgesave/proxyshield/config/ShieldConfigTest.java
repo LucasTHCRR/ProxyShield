@@ -83,10 +83,27 @@ class ShieldConfigTest {
    }
 
    @Test
-   void apiTemplateCarriesTheIpPlaceholder() {
-      assertTrue(shipped.apiUrl().contains("{ip}"),
-            "without {ip} every lookup would query the same address");
+   void apiTemplatesCarryTheIpPlaceholder() {
+      List<String> providers = shipped.activeApiProviders();
+
+      assertFalse(providers.isEmpty(), "at least one lookup provider must be configured");
+      for (String provider : providers) {
+         assertTrue(provider.contains("{ip}"),
+               provider + " has no {ip}, so every lookup would query the same address");
+      }
       assertEquals(45, shipped.apiRateLimitPerMinute(), "must match the free tier limit");
+   }
+
+   @Test
+   @DisplayName("Emptying the provider list yields no provider rather than a hidden default")
+   void emptyProviderListStaysEmpty() {
+      assertTrue(ShieldConfig.from(new MapConfigNode(Map.of())).activeApiProviders().isEmpty());
+   }
+
+   @Test
+   @DisplayName("Bedrock players are exempt by default")
+   void bedrockExemptionDefaultsOn() {
+      assertTrue(shipped.exemptBedrock());
    }
 
    @Test

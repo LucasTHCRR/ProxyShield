@@ -188,7 +188,8 @@ public final class CommandHandler {
             "whitelist", String.valueOf(core.whitelist().rangeCount()),
             "blacklist", String.valueOf(core.blacklist().rangeCount())));
       send(sender, "info-provider", of(
-            "provider", providerHost(config.apiUrl()),
+            "provider", core.lookups().primaryHost()
+                  + " (+" + Math.max(0, core.lookups().providerCount() - 1) + ")",
             "failmode", m.get(config.failClosed() ? "fail-closed" : "fail-open")));
    }
 
@@ -292,7 +293,7 @@ public final class CommandHandler {
       core.platform().runAsync(() -> {
          CheckEngine engine = new CheckEngine(core.config(), core.lists(), core.lookups(),
                core.whitelist(), core.blacklist());
-         CheckVerdict verdict = engine.check(target, ip, CheckEngine.PermissionProbe.NONE);
+         CheckVerdict verdict = engine.check(target, null, ip, CheckEngine.PermissionProbe.NONE);
          LookupResult lookup = verdict.lookup();
 
          send(sender, "check-header");
@@ -432,17 +433,6 @@ public final class CommandHandler {
       }
       Optional<ShieldPlayer> player = core.platform().player(target);
       return player.map(ShieldPlayer::ip).orElse(target);
-   }
-
-   /** Host portion of the configured endpoint, for display only. */
-   private static String providerHost(String url) {
-      int start = url.indexOf("://");
-      if (start < 0) {
-         return url;
-      }
-      int from = start + 3;
-      int end = url.indexOf('/', from);
-      return end < 0 ? url.substring(from) : url.substring(from, end);
    }
 
    private String yesNo(boolean value) {

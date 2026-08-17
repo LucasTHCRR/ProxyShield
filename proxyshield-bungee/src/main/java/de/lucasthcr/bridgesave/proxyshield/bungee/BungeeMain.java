@@ -56,12 +56,13 @@ public final class BungeeMain extends Plugin implements Listener {
       PendingConnection connection = event.getConnection();
       String ip = addressOf(connection);
       String name = connection.getName();
+      java.util.UUID uuid = connection.getUniqueId();
 
       event.registerIntent(this);
       getProxy().getScheduler().runAsync(this, () -> {
          try {
             ProxyShieldCore.ConnectionDecision decision =
-                  core.handleLogin(name, ip, probeFor(name));
+                  core.handleLogin(name, uuid, ip, probeFor(name));
             if (decision.deny()) {
                event.setCancelReason(TextComponent.fromLegacyText(
                      BungeePlatform.color(decision.kickMessage())));

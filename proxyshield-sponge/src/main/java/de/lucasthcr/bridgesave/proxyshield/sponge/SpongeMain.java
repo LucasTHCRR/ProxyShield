@@ -99,7 +99,8 @@ public final class SpongeMain {
       // No Subject exists during the auth handshake, so permission based bypass cannot be
       // evaluated here. Use whitelist.players or whitelist.ips on Sponge.
       ProxyShieldCore.ConnectionDecision decision =
-            core.handleLogin(name, ip, CheckEngine.PermissionProbe.NONE);
+            core.handleLogin(name, event.profile().uniqueId(), ip,
+                  CheckEngine.PermissionProbe.NONE);
 
       if (decision.deny()) {
          event.setCancelled(true);

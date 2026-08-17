@@ -61,7 +61,7 @@ public final class PaperMain extends JavaPlugin implements Listener, CommandExec
    public void onPreLogin(AsyncPlayerPreLoginEvent event) {
       String ip = event.getAddress() == null ? null : event.getAddress().getHostAddress();
       ProxyShieldCore.ConnectionDecision decision =
-            core.handleLogin(event.getName(), ip, probeFor(event));
+            core.handleLogin(event.getName(), event.getUniqueId(), ip, probeFor(event));
 
       if (decision.deny()) {
          // The String overload is the one Spigot has; Paper's Component variant would not link.

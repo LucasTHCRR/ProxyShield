@@ -32,6 +32,7 @@ public final class ShieldConfig {
    private final boolean useLists;
    private final boolean useApi;
    private final boolean recheckOnline;
+   private final boolean exemptBedrock;
 
    // country
    private final boolean countryEnabled;
@@ -52,6 +53,7 @@ public final class ShieldConfig {
 
    // api
    private final String apiUrl;
+   private final List<String> apiProviders;
    private final int apiTimeoutSeconds;
    private final long apiCacheMinutes;
    private final int apiMaxCacheEntries;
@@ -82,6 +84,7 @@ public final class ShieldConfig {
       this.useLists = node.getBoolean("detection.use-lists", true);
       this.useApi = node.getBoolean("detection.use-api", true);
       this.recheckOnline = node.getBoolean("detection.recheck-online-on-reload", false);
+      this.exemptBedrock = node.getBoolean("whitelist.bedrock-players", true);
 
       this.countryEnabled = node.getBoolean("country.enabled", false);
       this.countryMode = CountryMode.parse(node.getString("country.mode", "blacklist"));
@@ -97,8 +100,10 @@ public final class ShieldConfig {
       this.listDiskCache = node.getBoolean("lists.disk-cache", true);
       this.listSources = List.copyOf(node.getStringList("lists.sources"));
 
-      this.apiUrl = node.getString("api.url",
-            "http://ip-api.com/json/{ip}?fields=status,message,proxy,hosting,countryCode,country,isp");
+      // Superseded by api.providers. Empty by default so an empty provider list stays empty
+      // rather than silently falling back to a hardcoded endpoint.
+      this.apiUrl = node.getString("api.url", "");
+      this.apiProviders = List.copyOf(node.getStringList("api.providers"));
       this.apiTimeoutSeconds = clamp(node.getInt("api.timeout-seconds", 5), 1, 60);
       this.apiCacheMinutes = Math.max(1L, node.getLong("api.cache-minutes", 360L));
       this.apiMaxCacheEntries = clamp(node.getInt("api.max-cache-entries", 10000), 100, 1000000);
@@ -197,6 +202,11 @@ public final class ShieldConfig {
       return recheckOnline;
    }
 
+   /** Whether Geyser/Floodgate players skip every check. */
+   public boolean exemptBedrock() {
+      return exemptBedrock;
+   }
+
    public boolean countryEnabled() {
       return countryEnabled;
    }
@@ -239,6 +249,25 @@ public final class ShieldConfig {
 
    public String apiUrl() {
       return apiUrl;
+   }
+
+   /**
+    * Lookup endpoints in the order they should be tried, each with an {@code {ip}} placeholder.
+    * <p>
+    * Falls back to the single {@code api.url} when {@code api.providers} is empty, so a config
+    * written for an earlier build keeps working.
+    */
+   public List<String> activeApiProviders() {
+      List<String> out = new ArrayList<>();
+      for (String provider : apiProviders) {
+         if (provider != null && !provider.isBlank()) {
+            out.add(provider.trim());
+         }
+      }
+      if (out.isEmpty() && apiUrl != null && !apiUrl.isBlank()) {
+         out.add(apiUrl.trim());
+      }
+      return out;
    }
 
    public int apiTimeoutSeconds() {

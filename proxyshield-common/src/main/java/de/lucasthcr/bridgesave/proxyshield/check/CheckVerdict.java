@@ -11,6 +11,7 @@ public record CheckVerdict(Reason reason, String detail, LookupResult lookup) {
       WHITELISTED_IP("whitelisted IP", false),
       WHITELISTED_PLAYER("whitelisted player", false),
       LOCAL_ADDRESS("local address", false),
+      BEDROCK_PLAYER("Bedrock player", false),
 
       BLACKLISTED("blacklisted IP", true),
       IP_LIST("VPN list", true),

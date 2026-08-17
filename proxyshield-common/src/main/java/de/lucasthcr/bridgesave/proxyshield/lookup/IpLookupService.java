@@ -1,6 +1,5 @@
 package de.lucasthcr.bridgesave.proxyshield.lookup;
 
-import de.lucasthcr.bridgesave.proxyshield.cache.ExpiringCache;
 import de.lucasthcr.bridgesave.proxyshield.config.ShieldConfig;
 import de.lucasthcr.bridgesave.proxyshield.platform.Platform;
 import de.lucasthcr.bridgesave.proxyshield.util.Json;
@@ -13,77 +12,60 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Queries the configured IP intelligence provider, with caching and rate limiting.
+ * Queries one IP intelligence endpoint, with its own rate limiter.
  * <p>
- * The default provider is ip-api.com, whose free tier allows 45 requests per minute and answers
- * with a flat JSON object. v1 ignored the rate limit entirely and decided "is this a proxy" by
- * testing whether the raw first line of the response contained the substring {@code "true"}, which
- * also matched a country named e.g. {@code "Truelandia"} and broke as soon as the response spanned
- * more than one line.
+ * Caching lives in {@link FailoverLookupService}, which owns the chain of these. Responses are
+ * parsed as JSON: v1 decided "is this a proxy" by testing whether the raw first line contained the
+ * substring {@code "true"}, which an ISP or country name could satisfy on its own and which broke
+ * outright once a response spanned more than one line.
  */
 public final class IpLookupService implements LookupProvider {
 
-   private static final String USER_AGENT = "ProxyShield/2.0";
+   private static final String USER_AGENT = "ProxyShield/2.1";
 
    private final Platform platform;
-   private final ExpiringCache<String, LookupResult> cache;
-   private final int requestsPerMinute;
    private final String urlTemplate;
    private final int timeoutMillis;
+   private final int requestsPerMinute;
 
    private final AtomicLong windowStart = new AtomicLong(System.currentTimeMillis());
    private final AtomicLong windowCount = new AtomicLong();
-
-   private final AtomicLong lookups = new AtomicLong();
    private final AtomicLong rateLimited = new AtomicLong();
-   private final AtomicLong failures = new AtomicLong();
 
-   public IpLookupService(Platform platform, ShieldConfig config) {
+   public IpLookupService(Platform platform, ShieldConfig config, String urlTemplate) {
       this.platform = platform;
-      this.urlTemplate = config.apiUrl();
+      this.urlTemplate = urlTemplate;
       this.timeoutMillis = config.apiTimeoutSeconds() * 1000;
       this.requestsPerMinute = config.apiRateLimitPerMinute();
-      this.cache = new ExpiringCache<>(config.apiMaxCacheEntries(),
-            config.apiCacheMinutes() * 60_000L);
    }
 
-   /** Cached result for this address, if one is still valid. */
-   public Optional<LookupResult> cached(String ip) {
-      return cache.get(ip);
+   /** Host portion of the endpoint, for log lines and {@code /proxyshield info}. */
+   public String host() {
+      try {
+         String host = URI.create(urlTemplate.replace("{ip}", "0.0.0.0")).getHost();
+         return host == null ? urlTemplate : host;
+      } catch (RuntimeException malformed) {
+         return urlTemplate;
+      }
    }
 
    /**
-    * Returns the cached result or performs a blocking HTTP lookup.
+    * Performs a blocking HTTP lookup.
     * <p>
     * Must never be called from the main thread. Failures come back as an unresolved
-    * {@link LookupResult} rather than an exception, so the caller can apply the fail-open or
-    * fail-closed policy.
+    * {@link LookupResult} rather than an exception, so the caller can fail over or apply the
+    * fail-open policy.
     */
    @Override
    public LookupResult lookup(String ip) {
-      Optional<LookupResult> hit = cache.get(ip);
-      if (hit.isPresent()) {
-         return hit.get();
-      }
-
       if (!tryConsumeToken()) {
          rateLimited.incrementAndGet();
-         // Deliberately not cached: this says nothing about the address itself.
          return LookupResult.failed("rate limit reached (" + requestsPerMinute + "/min)");
       }
-
-      LookupResult result = query(ip);
-      lookups.incrementAndGet();
-      if (result.resolved()) {
-         cache.put(ip, result);
-      } else {
-         failures.incrementAndGet();
-      }
-      return result;
+      return query(ip);
    }
 
    private LookupResult query(String ip) {
@@ -105,8 +87,7 @@ public final class IpLookupService implements LookupProvider {
             return LookupResult.failed("HTTP " + status);
          }
 
-         String body = readBody(connection);
-         return parse(body);
+         return parse(readBody(connection), ip);
       } catch (IOException | RuntimeException failure) {
          return LookupResult.failed(failure.getClass().getSimpleName() + ": "
                + failure.getMessage());
@@ -132,7 +113,9 @@ public final class IpLookupService implements LookupProvider {
       return body.toString();
    }
 
-   private LookupResult parse(String body) {
+   /** Understands the shapes the common free providers return. */
+   @SuppressWarnings("unchecked")
+   LookupResult parse(String body, String ip) {
       Map<String, Object> json;
       try {
          json = Json.parseObject(body);
@@ -146,31 +129,43 @@ public final class IpLookupService implements LookupProvider {
 
       // ip-api.com reports failures in-band with HTTP 200.
       String status = Json.stringOf(json, "status");
-      if (status != null && !"success".equalsIgnoreCase(status)) {
+      if (status != null && !"success".equalsIgnoreCase(status) && !"ok".equalsIgnoreCase(status)) {
          String message = Json.stringOf(json, "message");
          return LookupResult.failed(message == null ? status : status + ": " + message);
       }
 
-      boolean proxy = Json.boolOf(json, "proxy");
-      boolean hosting = Json.boolOf(json, "hosting");
-      // Common alternative field names across providers.
-      if (!proxy) {
-         proxy = Json.boolOf(json, "vpn") || Json.boolOf(json, "tor") || Json.boolOf(json, "block");
+      // proxycheck.io nests the data under the queried address instead of returning it flat.
+      Object nested = json.get(ip);
+      if (nested instanceof Map<?, ?> perAddress) {
+         json = (Map<String, Object>) perAddress;
       }
-      if (!hosting) {
-         hosting = Json.boolOf(json, "datacenter");
-      }
+
+      boolean proxy = Json.boolOf(json, "proxy")
+            || Json.boolOf(json, "vpn")
+            || Json.boolOf(json, "tor")
+            || Json.boolOf(json, "block");
+      boolean hosting = Json.boolOf(json, "hosting") || Json.boolOf(json, "datacenter");
 
       String code = Json.stringOf(json, "countryCode");
       if (code == null) {
          code = Json.stringOf(json, "country_code");
       }
+      if (code == null) {
+         code = Json.stringOf(json, "isocode");
+      }
 
-      return LookupResult.of(proxy, hosting, code, Json.stringOf(json, "country"),
-            Json.stringOf(json, "isp"));
+      String isp = Json.stringOf(json, "isp");
+      if (isp == null) {
+         isp = Json.stringOf(json, "provider");
+      }
+      if (isp == null) {
+         isp = Json.stringOf(json, "organisation");
+      }
+
+      return LookupResult.of(proxy, hosting, code, Json.stringOf(json, "country"), isp);
    }
 
-   /** Fixed-window limiter. Coarse, but exactly matches how the provider counts. */
+   /** Fixed-window limiter. Coarse, but exactly matches how the providers count. */
    private boolean tryConsumeToken() {
       long now = System.currentTimeMillis();
       long start = windowStart.get();
@@ -180,44 +175,16 @@ public final class IpLookupService implements LookupProvider {
       return windowCount.incrementAndGet() <= requestsPerMinute;
    }
 
-   public void invalidate(String ip) {
-      cache.invalidate(ip);
-   }
-
-   public void clearCache() {
-      cache.clear();
-   }
-
-   public int purgeExpired() {
-      return cache.purgeExpired();
-   }
-
-   public int cacheSize() {
-      return cache.size();
-   }
-
-   public long cacheHits() {
-      return cache.hits();
-   }
-
-   public long lookups() {
-      return lookups.get();
-   }
-
    public long rateLimitedCount() {
       return rateLimited.get();
    }
 
-   public long failureCount() {
-      return failures.get();
-   }
-
-   /** Warns once at startup if the endpoint is plain HTTP. */
+   /** Warns at startup if this endpoint is plain HTTP. */
    public void warnIfInsecure() {
       if (urlTemplate.startsWith("http://")) {
-         platform.warn("The lookup endpoint uses plain HTTP, so results can be tampered with in "
-               + "transit. ip-api.com only offers HTTPS on paid plans; switch api.url to an HTTPS "
-               + "provider if that matters to you.");
+         platform.warn("Lookup endpoint " + host() + " uses plain HTTP, so results can be tampered "
+               + "with in transit. ip-api.com only offers HTTPS on paid plans; add an HTTPS "
+               + "provider under api.providers if that matters to you.");
       }
    }
 }

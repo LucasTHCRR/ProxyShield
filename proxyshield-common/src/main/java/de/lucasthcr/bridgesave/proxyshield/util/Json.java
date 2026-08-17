@@ -165,16 +165,23 @@ public final class Json {
       return value == null ? null : String.valueOf(value);
    }
 
+   /**
+    * Reads a flag, accepting the spellings the various providers use.
+    * <p>
+    * ip-api.com sends a real JSON boolean, proxycheck.io sends {@code "yes"} / {@code "no"}, and
+    * some send {@code 1} / {@code 0}.
+    */
    public static boolean boolOf(Map<String, Object> object, String key) {
       Object value = object.get(key);
       if (value instanceof Boolean flag) {
          return flag;
       }
-      if (value instanceof String text) {
-         return Boolean.parseBoolean(text);
-      }
       if (value instanceof Number number) {
          return number.intValue() != 0;
+      }
+      if (value instanceof String text) {
+         String normalized = text.trim().toLowerCase(java.util.Locale.ROOT);
+         return normalized.equals("true") || normalized.equals("yes") || normalized.equals("1");
       }
       return false;
    }

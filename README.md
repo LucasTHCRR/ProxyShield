@@ -6,11 +6,11 @@ identically.
 
 | Build | File | Runs on |
 |---|---|---|
-| Paper | `ProxyShield-Paper-2.0.jar` | Paper, Purpur and Spigot 1.21+ |
-| Folia | `ProxyShield-Folia-2.0.jar` | Folia |
-| BungeeCord | `ProxyShield-Bungee-2.0.jar` | BungeeCord / Waterfall |
-| Velocity | `ProxyShield-Velocity-2.0.jar` | Velocity 3.3+ |
-| Sponge | `ProxyShield-Sponge-2.0.jar` | SpongeAPI 17 |
+| Paper | `ProxyShield-Paper-2.1.jar` | Paper, Purpur and Spigot 1.21+ |
+| Folia | `ProxyShield-Folia-2.1.jar` | Folia |
+| BungeeCord | `ProxyShield-Bungee-2.1.jar` | BungeeCord / Waterfall |
+| Velocity | `ProxyShield-Velocity-2.1.jar` | Velocity 3.3+ |
+| Sponge | `ProxyShield-Sponge-2.1.jar` | SpongeAPI 17 |
 
 The Paper and Folia jars are built from the same sources and are interchangeable — the scheduling
 already uses the regionised API, so either one runs on either server. They exist separately because
@@ -31,7 +31,7 @@ address.
 **Detection**
 
 - Public VPN and proxy IP feeds with correct CIDR matching, IPv4 and IPv6
-- Live provider lookup for proxy, VPN, Tor and datacenter flags
+- Live provider lookup for proxy, VPN, Tor and datacenter flags, with failover across providers
 - Country filtering, blacklist or whitelist mode
 - Manual blacklist, checked before the feeds and the provider
 - Configurable fail-open or fail-closed behaviour when a check cannot complete
@@ -42,6 +42,7 @@ address.
 - Player name whitelist
 - Bypass permission
 - Loopback and private addresses are never checked, and never cost lookup quota
+- Bedrock players joining through Geyser/Floodgate are exempt by default
 
 **Operations**
 
@@ -155,14 +156,15 @@ anything that can block one, so an operator can always whitelist their way out o
 | 1 | `proxyshield.bypass` permission | allow | none |
 | 2 | Name in `whitelist.players` | allow | none |
 | 3 | IP in `whitelist.ips` | allow | none |
-| 4 | Loopback or private address | allow | none |
+| 4 | Bedrock player via Floodgate | allow | none |
+| 5 | Loopback or private address | allow | none |
 | 5 | IP in `blacklist.ips` | **block** | none |
-| 6 | IP in a downloaded feed | **block** | ~0.6 µs |
-| 7 | Provider reports `proxy` | **block** | one HTTP request per uncached IP |
-| 8 | Provider reports `hosting` | **block** | same request |
-| 9 | Country not permitted | **block** | same request |
+| 7 | IP in a downloaded feed | **block** | ~0.6 µs |
+| 8 | Provider reports `proxy` | **block** | one HTTP request per uncached IP |
+| 9 | Provider reports `hosting` | **block** | same request |
+| 10 | Country not permitted | **block** | same request |
 
-Steps 1 to 6 never touch the network. Step 7 onwards costs one provider request per address that is
+Steps 1 to 7 never touch the network. Step 7 onwards costs one provider request per address that is
 not in the cache, which is why the cache TTL matters more than the rate limit on most servers.
 
 ### Performance
@@ -196,7 +198,7 @@ The five plugin jars land in `proxyshield-*/target/`. Tests run as part of the b
 ### Module layout
 
 ```
-proxyshield-common     detection core, no platform APIs, 111 tests
+proxyshield-common     detection core, no platform APIs, 124 tests
 proxyshield-paper      Bukkit adapter    → AsyncPlayerPreLoginEvent, Paper/Folia/Spigot
 proxyshield-folia      same sources as proxyshield-paper, own descriptor and jar name
 proxyshield-bungee     Bungee adapter    → LoginEvent with intents

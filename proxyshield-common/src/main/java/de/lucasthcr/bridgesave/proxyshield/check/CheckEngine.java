@@ -7,6 +7,7 @@ import de.lucasthcr.bridgesave.proxyshield.lookup.LookupResult;
 import de.lucasthcr.bridgesave.proxyshield.net.IpAddresses;
 import de.lucasthcr.bridgesave.proxyshield.net.ManagedIpList;
 import java.util.Locale;
+import java.util.UUID;
 
 /**
  * Decides whether a connection may proceed.
@@ -42,10 +43,16 @@ public final class CheckEngine {
    /**
     * Runs the full pipeline. Performs a blocking HTTP lookup when needed, so this must be called
     * off the main thread.
+    *
+    * @param uuid the connecting player's UUID, or {@code null} where the platform has none yet
     */
-   public CheckVerdict check(String playerName, String ip, PermissionProbe probe) {
+   public CheckVerdict check(String playerName, UUID uuid, String ip, PermissionProbe probe) {
       if (probe != null && probe.has(config.bypassPermission())) {
          return CheckVerdict.allow(CheckVerdict.Reason.BYPASS_PERMISSION);
+      }
+
+      if (config.exemptBedrock() && BedrockPlayers.isBedrock(uuid)) {
+         return CheckVerdict.allow(CheckVerdict.Reason.BEDROCK_PLAYER);
       }
 
       if (playerName != null

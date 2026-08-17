@@ -38,7 +38,7 @@ import org.slf4j.Logger;
 )
 public final class VelocityMain {
 
-   public static final String VERSION = "2.0";
+   public static final String VERSION = "2.1";
 
    private final ProxyServer server;
    private final Logger logger;
@@ -85,7 +85,7 @@ public final class VelocityMain {
 
       return EventTask.async(() -> {
          ProxyShieldCore.ConnectionDecision decision = core.handleLogin(
-               player.getUsername(), ip, player::hasPermission);
+               player.getUsername(), player.getUniqueId(), ip, player::hasPermission);
          if (decision.deny()) {
             event.setResult(ResultedEvent.ComponentResult.denied(
                   VelocityPlatform.color(decision.kickMessage())));

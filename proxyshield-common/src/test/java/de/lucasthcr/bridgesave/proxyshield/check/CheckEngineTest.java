@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -73,7 +74,7 @@ class CheckEngineTest {
          CheckEngine engine = engine(baseConfig(), ip -> LookupResult.of(true, true, "RU", "", ""),
                List.of("1.2.3.0/24"));
 
-         CheckVerdict verdict = engine.check("Steve", "1.2.3.4", permission -> true);
+         CheckVerdict verdict = engine.check("Steve", null, "1.2.3.4", permission -> true);
 
          assertFalse(verdict.blocked());
          assertEquals(CheckVerdict.Reason.BYPASS_PERMISSION, verdict.reason());
@@ -87,7 +88,7 @@ class CheckEngineTest {
          CheckEngine engine = engine(config, ip -> LookupResult.of(true, true, "RU", "", ""),
                List.of("1.2.3.0/24"));
 
-         CheckVerdict verdict = engine.check("steve", "1.2.3.4", CheckEngine.PermissionProbe.NONE);
+         CheckVerdict verdict = engine.check("steve", null, "1.2.3.4", CheckEngine.PermissionProbe.NONE);
 
          assertEquals(CheckVerdict.Reason.WHITELISTED_PLAYER, verdict.reason());
       }
@@ -100,7 +101,7 @@ class CheckEngineTest {
 
          CheckEngine engine = engine(config, clean(), List.of());
 
-         CheckVerdict verdict = engine.check("Steve", "1.2.3.4", CheckEngine.PermissionProbe.NONE);
+         CheckVerdict verdict = engine.check("Steve", null, "1.2.3.4", CheckEngine.PermissionProbe.NONE);
 
          assertFalse(verdict.blocked());
          assertEquals(CheckVerdict.Reason.WHITELISTED_IP, verdict.reason());
@@ -114,7 +115,7 @@ class CheckEngineTest {
                },
                List.of());
 
-         CheckVerdict verdict = engine.check("Steve", "192.168.1.20",
+         CheckVerdict verdict = engine.check("Steve", null, "192.168.1.20",
                CheckEngine.PermissionProbe.NONE);
 
          assertEquals(CheckVerdict.Reason.LOCAL_ADDRESS, verdict.reason());
@@ -136,7 +137,7 @@ class CheckEngineTest {
                },
                List.of());
 
-         CheckVerdict verdict = engine.check("Steve", "203.0.113.7",
+         CheckVerdict verdict = engine.check("Steve", null, "203.0.113.7",
                CheckEngine.PermissionProbe.NONE);
 
          assertTrue(verdict.blocked());
@@ -151,7 +152,7 @@ class CheckEngineTest {
                },
                List.of("45.60.0.0/16"));
 
-         CheckVerdict verdict = engine.check("Steve", "45.60.1.2",
+         CheckVerdict verdict = engine.check("Steve", null, "45.60.1.2",
                CheckEngine.PermissionProbe.NONE);
 
          assertTrue(verdict.blocked());
@@ -163,7 +164,7 @@ class CheckEngineTest {
          CheckEngine engine = engine(baseConfig(),
                ip -> LookupResult.of(true, false, "NL", "Netherlands", "NordVPN"), List.of());
 
-         CheckVerdict verdict = engine.check("Steve", "203.0.113.7",
+         CheckVerdict verdict = engine.check("Steve", null, "203.0.113.7",
                CheckEngine.PermissionProbe.NONE);
 
          assertTrue(verdict.blocked());
@@ -179,7 +180,7 @@ class CheckEngineTest {
          CheckEngine engine = engine(config,
                ip -> LookupResult.of(false, true, "DE", "Germany", "Hetzner"), List.of());
 
-         CheckVerdict verdict = engine.check("Steve", "203.0.113.7",
+         CheckVerdict verdict = engine.check("Steve", null, "203.0.113.7",
                CheckEngine.PermissionProbe.NONE);
 
          assertFalse(verdict.blocked());
@@ -200,7 +201,7 @@ class CheckEngineTest {
          CheckEngine engine = engine(config,
                ip -> LookupResult.of(false, false, "RU", "Russia", "Rostelecom"), List.of());
 
-         CheckVerdict verdict = engine.check("Steve", "203.0.113.7",
+         CheckVerdict verdict = engine.check("Steve", null, "203.0.113.7",
                CheckEngine.PermissionProbe.NONE);
 
          assertTrue(verdict.blocked());
@@ -216,7 +217,7 @@ class CheckEngineTest {
 
          CheckEngine engine = engine(config, clean(), List.of());
 
-         assertFalse(engine.check("Steve", "203.0.113.7", CheckEngine.PermissionProbe.NONE)
+         assertFalse(engine.check("Steve", null, "203.0.113.7", CheckEngine.PermissionProbe.NONE)
                .blocked());
       }
 
@@ -228,12 +229,12 @@ class CheckEngineTest {
          config.put("country.codes", List.of("DE", "AT", "CH"));
 
          CheckEngine allowed = engine(config, clean(), List.of());
-         assertFalse(allowed.check("Steve", "203.0.113.7", CheckEngine.PermissionProbe.NONE)
+         assertFalse(allowed.check("Steve", null, "203.0.113.7", CheckEngine.PermissionProbe.NONE)
                .blocked());
 
          CheckEngine blocked = engine(config,
                ip -> LookupResult.of(false, false, "US", "United States", "Comcast"), List.of());
-         assertTrue(blocked.check("Steve", "203.0.113.7", CheckEngine.PermissionProbe.NONE)
+         assertTrue(blocked.check("Steve", null, "203.0.113.7", CheckEngine.PermissionProbe.NONE)
                .blocked());
       }
 
@@ -246,7 +247,7 @@ class CheckEngineTest {
          CheckEngine engine = engine(config,
                ip -> LookupResult.of(false, false, null, null, "Some ISP"), List.of());
 
-         CheckVerdict verdict = engine.check("Steve", "203.0.113.7",
+         CheckVerdict verdict = engine.check("Steve", null, "203.0.113.7",
                CheckEngine.PermissionProbe.NONE);
 
          assertTrue(verdict.blocked());
@@ -264,7 +265,7 @@ class CheckEngineTest {
          CheckEngine engine = engine(config,
                ip -> LookupResult.of(true, true, "RU", "Russia", "Rostelecom"), List.of());
 
-         CheckVerdict verdict = engine.check("Steve", "203.0.113.7",
+         CheckVerdict verdict = engine.check("Steve", null, "203.0.113.7",
                CheckEngine.PermissionProbe.NONE);
 
          assertTrue(verdict.blocked());
@@ -281,7 +282,7 @@ class CheckEngineTest {
       void failOpenLetsPlayersInWhenTheProviderIsDown() throws IOException {
          CheckEngine engine = engine(baseConfig(), ip -> LookupResult.failed("timeout"), List.of());
 
-         CheckVerdict verdict = engine.check("Steve", "203.0.113.7",
+         CheckVerdict verdict = engine.check("Steve", null, "203.0.113.7",
                CheckEngine.PermissionProbe.NONE);
 
          assertFalse(verdict.blocked());
@@ -294,7 +295,7 @@ class CheckEngineTest {
 
          CheckEngine engine = engine(config, ip -> LookupResult.failed("timeout"), List.of());
 
-         CheckVerdict verdict = engine.check("Steve", "203.0.113.7",
+         CheckVerdict verdict = engine.check("Steve", null, "203.0.113.7",
                CheckEngine.PermissionProbe.NONE);
 
          assertTrue(verdict.blocked());
@@ -305,9 +306,61 @@ class CheckEngineTest {
       void unreadableAddressIsNeverPunished() throws IOException {
          CheckEngine engine = engine(baseConfig(), clean(), List.of());
 
-         assertFalse(engine.check("Steve", null, CheckEngine.PermissionProbe.NONE).blocked());
-         assertFalse(engine.check("Steve", "not-an-ip", CheckEngine.PermissionProbe.NONE)
+         assertFalse(engine.check("Steve", null, null, CheckEngine.PermissionProbe.NONE).blocked());
+         assertFalse(engine.check("Steve", null, "not-an-ip", CheckEngine.PermissionProbe.NONE)
                .blocked());
+      }
+   }
+
+   @Nested
+   @DisplayName("Bedrock players")
+   class Bedrock {
+
+      /** Floodgate UUIDs have zero in the high 64 bits. */
+      private static final UUID BEDROCK = new UUID(0L, 0x0901f588cbe8e0L);
+      private static final UUID JAVA = UUID.fromString("069a79f4-44e9-4726-a5be-fca90e38aaf5");
+
+      @Test
+      @DisplayName("A Geyser player on a listed datacenter address is let through")
+      void bedrockIsExemptByDefault() throws IOException {
+         CheckEngine engine = engine(baseConfig(),
+               ip -> LookupResult.of(false, true, "DE", "Germany", "Hetzner"),
+               List.of("203.0.113.0/24"));
+
+         CheckVerdict verdict = engine.check("Steve", BEDROCK, "203.0.113.7",
+               CheckEngine.PermissionProbe.NONE);
+
+         assertFalse(verdict.blocked());
+         assertEquals(CheckVerdict.Reason.BEDROCK_PLAYER, verdict.reason());
+      }
+
+      @Test
+      void aJavaPlayerOnTheSameAddressIsStillBlocked() throws IOException {
+         CheckEngine engine = engine(baseConfig(), clean(), List.of("203.0.113.0/24"));
+
+         CheckVerdict verdict = engine.check("Steve", JAVA, "203.0.113.7",
+               CheckEngine.PermissionProbe.NONE);
+
+         assertTrue(verdict.blocked(), "only Floodgate UUIDs may skip the check");
+      }
+
+      @Test
+      void exemptionCanBeTurnedOff() throws IOException {
+         Map<String, Object> config = baseConfig();
+         config.put("whitelist.bedrock-players", false);
+
+         CheckEngine engine = engine(config, clean(), List.of("203.0.113.0/24"));
+
+         assertTrue(engine.check("Steve", BEDROCK, "203.0.113.7",
+               CheckEngine.PermissionProbe.NONE).blocked());
+      }
+
+      @Test
+      void missingUuidDoesNotCountAsBedrock() throws IOException {
+         CheckEngine engine = engine(baseConfig(), clean(), List.of("203.0.113.0/24"));
+
+         assertTrue(engine.check("Steve", null, "203.0.113.7",
+               CheckEngine.PermissionProbe.NONE).blocked());
       }
    }
 
@@ -323,7 +376,7 @@ class CheckEngineTest {
             },
             List.of("203.0.113.0/24"));
 
-      assertFalse(engine.check("Steve", "203.0.113.7", CheckEngine.PermissionProbe.NONE)
+      assertFalse(engine.check("Steve", null, "203.0.113.7", CheckEngine.PermissionProbe.NONE)
             .blocked());
    }
 }

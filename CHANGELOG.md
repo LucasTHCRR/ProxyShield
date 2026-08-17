@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.1
+
+### Added
+
+- **Spigot support.** The Bukkit jar now runs on Paper, Purpur, Folia and plain Spigot. Async
+  scheduling, disconnecting a player and sending a message go through a bridge chosen at start-up,
+  so the Paper-only types are never loaded on a server that lacks them.
+- **Bedrock players are exempt by default** (`whitelist.bedrock-players`). Wherever Geyser runs
+  anywhere other than the player's own machine, the address seen here is Geyser's — and a Geyser
+  instance on rented hardware sits in exactly the datacenter ranges the feeds list, so without this
+  a server would drop every Bedrock player the moment hosting detection was switched on. Floodgate
+  derives these UUIDs server side from the Xbox Live account, so a Java player cannot fake one.
+- **Lookup provider failover** (`api.providers`). Endpoints are tried in order, so a rate limited or
+  unreachable provider costs one failed request instead of the whole check. Responses are understood
+  in both the flat shape (ip-api.com) and the nested-by-address shape (proxycheck.io), including the
+  field spellings `proxy`/`vpn`/`tor`/`block`, `hosting`/`datacenter`, `countryCode`/`isocode`,
+  `isp`/`provider`/`organisation` and `yes`/`no` flags.
+
+### Changed
+
+- `api.url` is superseded by `api.providers` and now defaults to empty. An existing `api.url` is
+  still honoured as the first provider, but emptying the provider list now genuinely means "no
+  provider" instead of silently falling back to a hardcoded endpoint.
+- 124 automated tests, up from 111.
+
 ## 2.0
 
 A full rewrite. One shared detection core, five platform builds, and every defect listed below

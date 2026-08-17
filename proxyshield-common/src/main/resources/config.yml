@@ -71,6 +71,16 @@ whitelist:
   # Never blocked, by name (case insensitive).
   players: []
 
+  # Exempt Bedrock players who joined through Geyser/Floodgate.
+  #
+  # Keep this on unless you know you need it off. Whenever Geyser runs anywhere
+  # other than the player's own machine, the address seen here is Geyser's — and
+  # a Geyser instance on rented hardware sits in exactly the datacenter ranges
+  # the feeds list, so every Bedrock player would be dropped at once.
+  # Floodgate derives these UUIDs server side from the Xbox Live account, so a
+  # Java player cannot fake one to skip the check.
+  bedrock-players: true
+
 blacklist:
   # Always blocked, checked before the lists and the provider.
   ips: []
@@ -99,10 +109,25 @@ lists:
     - "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/datacenter/ipv6.txt"
 
 api:
-  # {ip} is replaced with the address being checked. The response is read as JSON;
-  # the fields status, message, proxy, hosting, countryCode, country and isp are used.
-  # ip-api.com only serves HTTPS on paid plans, hence the http:// default.
-  url: "http://ip-api.com/json/{ip}?fields=status,message,proxy,hosting,countryCode,country,isp"
+  # Lookup endpoints, tried in order until one answers. {ip} is replaced with the
+  # address being checked.
+  #
+  # A single provider is a single point of failure, and the free tiers are the
+  # ones that go down or start refusing requests. With a second entry, a rate
+  # limited or unreachable first provider costs one failed request instead of
+  # the whole check.
+  #
+  # Responses are read as JSON. Both the flat shape (ip-api.com) and the
+  # nested-by-address shape (proxycheck.io) are understood, as are the field
+  # spellings proxy/vpn/tor/block, hosting/datacenter, countryCode/isocode and
+  # isp/provider/organisation.
+  #
+  # ip-api.com only serves HTTPS on paid plans, hence the http:// on the first.
+  # To use proxycheck.io, uncomment the second line and put your key in it —
+  # it works without one, but at a much lower daily limit.
+  providers:
+    - "http://ip-api.com/json/{ip}?fields=status,message,proxy,hosting,countryCode,country,isp"
+    # - "https://proxycheck.io/v2/{ip}?vpn=1&asn=1&key=YOUR_KEY"
 
   timeout-seconds: 5
 
@@ -112,8 +137,9 @@ api:
   # Upper bound on cached addresses. Least recently used entries are evicted.
   max-cache-entries: 10000
 
-  # ip-api.com allows 45 requests per minute on the free tier. Requests beyond
-  # this are skipped rather than sent, so the provider does not ban the server.
+  # Requests per minute, applied to each provider separately. Anything beyond it
+  # is skipped rather than sent, so a provider does not ban the server. 45 is the
+  # ip-api.com free tier limit.
   rate-limit-per-minute: 45
 
 notifications:

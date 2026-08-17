@@ -97,7 +97,7 @@ public final class DiscordWebhook {
             connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("POST");
             connection.setRequestProperty("Content-Type", "application/json");
-            connection.setRequestProperty("User-Agent", "ProxyShield/2.0");
+            connection.setRequestProperty("User-Agent", "ProxyShield/2.1");
             connection.setConnectTimeout(5000);
             connection.setReadTimeout(5000);
             connection.setDoOutput(true);

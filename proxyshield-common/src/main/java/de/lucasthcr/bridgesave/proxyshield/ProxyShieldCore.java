@@ -6,7 +6,7 @@ import de.lucasthcr.bridgesave.proxyshield.config.ShieldConfig;
 import de.lucasthcr.bridgesave.proxyshield.list.ListManager;
 import de.lucasthcr.bridgesave.proxyshield.lookup.LookupResult;
 import de.lucasthcr.bridgesave.proxyshield.message.Messages;
-import de.lucasthcr.bridgesave.proxyshield.lookup.IpLookupService;
+import de.lucasthcr.bridgesave.proxyshield.lookup.FailoverLookupService;
 import de.lucasthcr.bridgesave.proxyshield.net.ManagedIpList;
 import de.lucasthcr.bridgesave.proxyshield.notify.AlertDispatcher;
 import de.lucasthcr.bridgesave.proxyshield.notify.DiscordWebhook;
@@ -16,6 +16,7 @@ import de.lucasthcr.bridgesave.proxyshield.stats.Statistics;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Owns every piece of plugin state and exposes the two things a platform adapter needs: a decision
@@ -40,7 +41,7 @@ public final class ProxyShieldCore {
 
    private volatile ShieldConfig config;
    private volatile Messages messages;
-   private volatile IpLookupService lookups;
+   private volatile FailoverLookupService lookups;
    private volatile CheckEngine engine;
    private volatile DiscordWebhook webhook;
    private volatile AlertDispatcher alerts;
@@ -59,7 +60,7 @@ public final class ProxyShieldCore {
       config = ShieldConfig.from(platform.loadConfig());
       messages = Messages.load(platform, config.language());
 
-      lookups = new IpLookupService(platform, config);
+      lookups = new FailoverLookupService(platform, config);
       webhook = new DiscordWebhook(platform, config);
       alerts = new AlertDispatcher(platform, config, messages, webhook);
 
@@ -137,8 +138,7 @@ public final class ProxyShieldCore {
       messages = Messages.load(platform, updated.language());
 
       // The lookup cache is sized and timed by config, so it has to be rebuilt.
-      IpLookupService replacement = new IpLookupService(platform, updated);
-      lookups = replacement;
+      lookups = new FailoverLookupService(platform, updated);
 
       webhook.applyConfig(updated);
       alerts.applyConfig(updated, messages);
@@ -173,7 +173,7 @@ public final class ProxyShieldCore {
 
          CheckVerdict verdict;
          try {
-            verdict = engine.check(player.name(), ip, player::hasPermission);
+            verdict = engine.check(player.name(), player.uuid(), ip, player::hasPermission);
          } catch (RuntimeException unexpected) {
             platform.error("Recheck failed for " + player.name(), unexpected);
             continue;
@@ -225,12 +225,12 @@ public final class ProxyShieldCore {
     * Blocking: this may perform an HTTP lookup, so platform adapters must call it from an async
     * login hook, never from the main thread.
     */
-   public ConnectionDecision handleLogin(String playerName, String ip,
+   public ConnectionDecision handleLogin(String playerName, UUID uuid, String ip,
          CheckEngine.PermissionProbe probe) {
       ShieldConfig current = config;
       CheckVerdict verdict;
       try {
-         verdict = engine.check(playerName, ip, probe);
+         verdict = engine.check(playerName, uuid, ip, probe);
       } catch (RuntimeException unexpected) {
          platform.error("Check failed for " + playerName + " (" + ip + ")", unexpected);
          // An internal error must not lock players out unless the operator asked for that.
@@ -279,7 +279,7 @@ public final class ProxyShieldCore {
       return lists;
    }
 
-   public IpLookupService lookups() {
+   public FailoverLookupService lookups() {
       return lookups;
    }
 
