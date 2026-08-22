@@ -10,6 +10,7 @@
 [![Available for Purpur](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/purpur_vector.svg)](https://purpurmc.org/)
 [![Available for Spigot](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/spigot_vector.svg)](https://www.spigotmc.org/)
 [![Available for Bukkit](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/bukkit_vector.svg)](https://dev.bukkit.org/)
+[![Available for Folia](https://codeberg.org/LucasTHCR/ProxyShield/raw/branch/master/assets/badges/folia_vector.svg)](https://papermc.io/software/folia)
 [![Available for Sponge](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/sponge_vector.svg)](https://spongepowered.org/)
 [![Available for BungeeCord](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/bungeecord_vector.svg)](https://www.spigotmc.org/wiki/bungeecord/)
 [![Available for Waterfall](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/waterfall_vector.svg)](https://papermc.io/software/waterfall)
