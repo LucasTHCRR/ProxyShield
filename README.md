@@ -1,6 +1,26 @@
-# ProxyShield
+<div align="center">
+
+[![Discord](https://img.shields.io/badge/Discord-dc.gg%2Fpaperstream-5865F2?style=flat-square&logo=discord&logoColor=white)](https://dc.gg/paperstream)
+[![Release](https://img.shields.io/modrinth/v/proxyshield?style=flat-square&label=release&color=00AF5C)](https://modrinth.com/plugin/proxyshield/versions)
+[![Downloads](https://img.shields.io/modrinth/dt/proxyshield?style=flat-square&label=downloads&color=00AF5C)](https://modrinth.com/plugin/proxyshield)
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square)](https://www.gnu.org/licenses/gpl-3.0.txt)
+
+[![Built with Java 21](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/built-with/java21_vector.svg)](https://adoptium.net/)
+[![Available for Paper](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/paper_vector.svg)](https://papermc.io/)
+[![Available for Purpur](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/purpur_vector.svg)](https://purpurmc.org/)
+[![Available for Spigot](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/spigot_vector.svg)](https://www.spigotmc.org/)
+[![Available for Bukkit](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/bukkit_vector.svg)](https://dev.bukkit.org/)
+[![Available for Sponge](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/sponge_vector.svg)](https://spongepowered.org/)
+[![Available for BungeeCord](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/bungeecord_vector.svg)](https://www.spigotmc.org/wiki/bungeecord/)
+[![Available for Waterfall](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/waterfall_vector.svg)](https://papermc.io/software/waterfall)
+[![Available for Velocity](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/velocity_vector.svg)](https://papermc.io/software/velocity)
 
 [![Chat with us on Discord](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/social/discord-plural_vector.svg)](https://dc.gg/paperstream)
+[![Available on Codeberg](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/available/codeberg_vector.svg)](https://codeberg.org/LucasTHCR/ProxyShield)
+
+</div>
+
+# ProxyShield
 
 Anti-VPN and anti-proxy protection for Minecraft servers. Country filtering, Discord webhook alerts,
 a silent mode and a dry-run mode. One shared detection core, five native builds that behave
@@ -14,7 +34,7 @@ identically.
 | Velocity | `ProxyShield-Velocity-2.1.jar` | Velocity 3.3+ |
 | Sponge | `ProxyShield-Sponge-2.1.jar` | SpongeAPI 17 |
 
-The Paper and Folia jars are built from the same sources and are interchangeable — the scheduling
+The Paper and Folia jars are built from the same sources and are interchangeable. The scheduling
 already uses the regionised API, so either one runs on either server. They exist separately because
 server owners look for a jar named after their platform.
 
@@ -23,7 +43,7 @@ and Adventure components; Spigot has none of the three. The jar picks an impleme
 and the Paper-only types live in a class that is never loaded on a server without them.
 
 Install **one** jar, on the machine that accepts the connection. On a network that is the proxy
-(BungeeCord or Velocity) — the Paper build behind a proxy would only ever see the proxy's own
+(BungeeCord or Velocity). The Paper build behind a proxy would only ever see the proxy's own
 address.
 
 ---
@@ -95,7 +115,7 @@ detection, so you keep the data without announcing to everyone online that the f
 ```yaml
 discord:
   enabled: true
-  webhook-url: "https://discord.com/api/webhooks/…"
+  webhook-url: "https://discord.com/api/webhooks/..."
   show-ip: true
 ```
 
@@ -180,7 +200,7 @@ Measured with the four default feeds (62,555 entries compiled into 35,161 merged
 | Feed check per login | 589 ns |
 | 1000 logins | 0.59 ms total, about 1/85th of one tick |
 
-The provider lookup is the only part with real latency: typically 50–200 ms, capped by
+The provider lookup is the only part with real latency: typically 50 to 200 ms, capped by
 `api.timeout-seconds`. It runs off the main thread on every platform, so it delays that one player's
 login and never the server tick. Set `detection.use-api: false` for a pure feed setup with zero
 network traffic per login.
@@ -201,11 +221,11 @@ The five plugin jars land in `proxyshield-*/target/`. Tests run as part of the b
 
 ```
 proxyshield-common     detection core, no platform APIs, 124 tests
-proxyshield-paper      Bukkit adapter    → AsyncPlayerPreLoginEvent, Paper/Folia/Spigot
+proxyshield-paper      Bukkit adapter    -> AsyncPlayerPreLoginEvent, Paper/Folia/Spigot
 proxyshield-folia      same sources as proxyshield-paper, own descriptor and jar name
-proxyshield-bungee     Bungee adapter    → LoginEvent with intents
-proxyshield-velocity   Velocity adapter  → LoginEvent with EventTask.async
-proxyshield-sponge     Sponge adapter    → ServerSideConnectionEvent.Auth
+proxyshield-bungee     Bungee adapter    -> LoginEvent with intents
+proxyshield-velocity   Velocity adapter  -> LoginEvent with EventTask.async
+proxyshield-sponge     Sponge adapter    -> ServerSideConnectionEvent.Auth
 ```
 
 Each platform module shades `proxyshield-common`, so every jar is self-contained. The Velocity and
