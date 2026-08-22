@@ -1,5 +1,7 @@
 # ProxyShield
 
+[![Chat with us on Discord](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/social/discord-plural_vector.svg)](https://dc.gg/paperstream)
+
 Anti-VPN and anti-proxy protection for Minecraft servers. Country filtering, Discord webhook alerts,
 a silent mode and a dry-run mode. One shared detection core, five native builds that behave
 identically.
