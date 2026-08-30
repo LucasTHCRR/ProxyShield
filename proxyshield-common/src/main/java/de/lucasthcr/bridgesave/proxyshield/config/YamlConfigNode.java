@@ -105,6 +105,32 @@ public final class YamlConfigNode implements ConfigNode {
    }
 
    @Override
+   public double getDouble(String path, double def) {
+      Object value = resolve(path);
+      if (value instanceof Number number) {
+         return number.doubleValue();
+      }
+      try {
+         return value == null ? def : Double.parseDouble(String.valueOf(value).trim());
+      } catch (NumberFormatException notANumber) {
+         return def;
+      }
+   }
+
+   @Override
+   public List<String> getKeys(String path) {
+      Object value = resolve(path);
+      if (!(value instanceof Map<?, ?> section)) {
+         return List.of();
+      }
+      List<String> out = new ArrayList<>(section.size());
+      for (Object key : section.keySet()) {
+         out.add(String.valueOf(key));
+      }
+      return out;
+   }
+
+   @Override
    public List<String> getStringList(String path) {
       Object value = resolve(path);
       if (!(value instanceof List<?> list)) {

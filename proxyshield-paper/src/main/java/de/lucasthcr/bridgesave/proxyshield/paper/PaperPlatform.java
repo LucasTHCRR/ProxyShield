@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.bukkit.Bukkit;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -100,6 +101,17 @@ final class PaperPlatform implements Platform {
          @Override
          public List<String> getStringList(String path) {
             return configuration.getStringList(path);
+         }
+
+         @Override
+         public double getDouble(String path, double def) {
+            return configuration.getDouble(path, def);
+         }
+
+         @Override
+         public List<String> getKeys(String path) {
+            ConfigurationSection section = configuration.getConfigurationSection(path);
+            return section == null ? List.of() : new ArrayList<>(section.getKeys(false));
          }
       };
    }

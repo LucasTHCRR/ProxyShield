@@ -84,6 +84,52 @@ public final class IpAddresses {
       }
    }
 
+   /**
+    * The key an address is cached and rate-limited under.
+    * <p>
+    * IPv6 clients routinely get a whole /64 and rotate the host part, so caching the full address
+    * means a VPN answers a fresh lookup for every reconnect and the cache never hits. Folding v6
+    * down to its /64 is how the rest of the industry treats a "single" v6 client. IPv4 is returned
+    * unchanged.
+    */
+   public static String cacheKey(String input) {
+      byte[] address = parseLiteral(input);
+      if (address == null) {
+         return input;
+      }
+      if (address.length != 16) {
+         return input.trim();
+      }
+      return prefixOf(address, 8) + "::/64";
+   }
+
+   /**
+    * The neighbourhood an address belongs to, used by the join-rate heuristics: /24 for IPv4 and
+    * /48 for IPv6, which is roughly one customer allocation on either side.
+    */
+   public static String subnetKey(String input) {
+      byte[] address = parseLiteral(input);
+      if (address == null) {
+         return input;
+      }
+      if (address.length == 4) {
+         return (address[0] & 0xFF) + "." + (address[1] & 0xFF) + "." + (address[2] & 0xFF)
+               + ".0/24";
+      }
+      return prefixOf(address, 6) + "::/48";
+   }
+
+   private static String prefixOf(byte[] address, int bytes) {
+      StringBuilder out = new StringBuilder();
+      for (int i = 0; i < bytes; i += 2) {
+         if (i > 0) {
+            out.append(':');
+         }
+         out.append(Integer.toHexString(((address[i] & 0xFF) << 8) | (address[i + 1] & 0xFF)));
+      }
+      return out.toString();
+   }
+
    /** Converts a 4 byte address into the unsigned value held in the low 32 bits of a long. */
    public static long toLong(byte[] v4) {
       return ((long) (v4[0] & 0xFF) << 24)

@@ -12,11 +12,16 @@ public record CheckVerdict(Reason reason, String detail, LookupResult lookup) {
       WHITELISTED_PLAYER("whitelisted player", false),
       LOCAL_ADDRESS("local address", false),
       BEDROCK_PLAYER("Bedrock player", false),
+      TRUSTED_PLAYER("trusted player", false),
+      ALLOWED_ASN("allowed network", false),
 
       BLACKLISTED("blacklisted IP", true),
       IP_LIST("VPN list", true),
       PROXY("proxy/VPN", true),
       HOSTING("hosting/datacenter", true),
+      TOR("Tor exit node", true),
+      ASN("blocked network", true),
+      SUSPICIOUS("suspicious connection", true),
       COUNTRY("country block", true),
       LOOKUP_FAILED("lookup failed", true);
 

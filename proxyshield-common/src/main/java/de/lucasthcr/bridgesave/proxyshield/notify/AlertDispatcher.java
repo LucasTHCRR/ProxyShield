@@ -28,6 +28,12 @@ public final class AlertDispatcher {
    private static final DateTimeFormatter TIMESTAMP =
          DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+   private static final DateTimeFormatter FILE_STAMP =
+         DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmmss");
+
+   /** Size at which blocks.log is rolled over. */
+   private static final long MAX_LOG_BYTES = 16L * 1024 * 1024;
+
    private final Platform platform;
    private final DiscordWebhook webhook;
    private final Path logFile;
@@ -85,6 +91,8 @@ public final class AlertDispatcher {
       values.put("country", verdict.lookup().countryOrUnknown());
       values.put("isp", verdict.lookup().ispOrUnknown());
       values.put("action", enforced ? "blocked" : "dry-run");
+      values.put("asn", verdict.lookup().asnOrUnknown());
+      values.put("sources", verdict.lookup().sourceSummary());
       values.put("platform", platform.name());
       return values;
    }
@@ -110,6 +118,8 @@ public final class AlertDispatcher {
             + " | " + verdict.lookup().countryOrUnknown()
             + " | " + verdict.describe()
             + " | " + verdict.lookup().ispOrUnknown()
+            + " | " + verdict.lookup().asnOrUnknown()
+            + " | " + verdict.lookup().sourceSummary()
             + System.lineSeparator();
 
       logLock.lock();
@@ -127,6 +137,33 @@ public final class AlertDispatcher {
                + failure.getMessage());
       } finally {
          logLock.unlock();
+      }
+   }
+
+   /**
+    * Rolls blocks.log over once it gets large.
+    * <p>
+    * A busy proxy writes a line per detection and nothing ever trimmed the file, so on a network
+    * under sustained bot pressure it grew without limit until the disk ran out — taking the server
+    * with it, which is a worse outcome than any VPN getting through.
+    */
+   public void rotateLogIfLarge() {
+      try {
+         if (!Files.isRegularFile(logFile) || Files.size(logFile) < MAX_LOG_BYTES) {
+            return;
+         }
+         Path rolled = logFile.resolveSibling("blocks-" + LocalDateTime.now().format(FILE_STAMP)
+               + ".log");
+         logLock.lock();
+         try {
+            Files.move(logFile, rolled);
+         } finally {
+            logLock.unlock();
+         }
+         platform.info("blocks.log reached " + (MAX_LOG_BYTES / 1024 / 1024) + " MB and was rolled"
+               + " over to " + rolled.getFileName() + ".");
+      } catch (IOException failure) {
+         platform.warn("Could not rotate blocks.log: " + failure.getMessage());
       }
    }
 

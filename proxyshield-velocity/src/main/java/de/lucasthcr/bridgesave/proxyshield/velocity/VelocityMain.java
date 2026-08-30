@@ -16,6 +16,8 @@ import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import de.lucasthcr.bridgesave.proxyshield.ProxyShieldCore;
 import de.lucasthcr.bridgesave.proxyshield.command.CommandHandler;
+import de.lucasthcr.bridgesave.proxyshield.metrics.MetricsData;
+import org.bstats.velocity.Metrics;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.List;
@@ -38,20 +40,23 @@ import org.slf4j.Logger;
 )
 public final class VelocityMain {
 
-   public static final String VERSION = "2.1";
+   public static final String VERSION = "2.2";
 
    private final ProxyServer server;
    private final Logger logger;
    private final Path dataDirectory;
+   private final Metrics.Factory metricsFactory;
 
    private ProxyShieldCore core;
    private CommandHandler commands;
 
    @Inject
-   public VelocityMain(ProxyServer server, Logger logger, @DataDirectory Path dataDirectory) {
+   public VelocityMain(ProxyServer server, Logger logger, @DataDirectory Path dataDirectory,
+         Metrics.Factory metricsFactory) {
       this.server = server;
       this.logger = logger;
       this.dataDirectory = dataDirectory;
+      this.metricsFactory = metricsFactory;
    }
 
    @Subscribe
@@ -60,12 +65,39 @@ public final class VelocityMain {
       core.start();
       commands = new CommandHandler(core);
 
+      startMetrics();
+
       CommandManager manager = server.getCommandManager();
       CommandMeta meta = manager.metaBuilder("proxyshield")
             .aliases("ps", "antivpn")
             .plugin(this)
             .build();
       manager.register(meta, new ShieldCommand());
+   }
+
+   /**
+    * Starts bStats when it is switched on and an id is configured.
+    * <p>
+    * bStats ids are per platform, so the Velocity project has its own; without one configured
+    * there is nothing to report to.
+    */
+   private void startMetrics() {
+      int id = core.config().metricsPluginId();
+      if (!core.config().metricsEnabled() || id <= 0) {
+         return;
+      }
+      try {
+         Metrics metrics = metricsFactory.make(this, id);
+         MetricsData.pies(core).forEach((chart, value) ->
+               metrics.addCustomChart(new org.bstats.charts.SimplePie(chart,
+                     () -> MetricsData.pies(core).get(chart))));
+         metrics.addCustomChart(new org.bstats.charts.SingleLineChart("connections_blocked",
+               () -> MetricsData.blockedSinceLastReport(core)));
+         metrics.addCustomChart(new org.bstats.charts.SingleLineChart("lookups_performed",
+               () -> MetricsData.lookupsSinceLastReport(core)));
+      } catch (Throwable unavailable) {
+         logger.info("bStats metrics are not available: {}", unavailable.getMessage());
+      }
    }
 
    @Subscribe

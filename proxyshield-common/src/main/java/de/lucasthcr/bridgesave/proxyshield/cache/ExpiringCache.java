@@ -50,10 +50,63 @@ public final class ExpiringCache<K, V> {
    }
 
    public void put(K key, V value) {
+      put(key, value, ttlMillis);
+   }
+
+   /**
+    * Stores an entry with its own lifetime.
+    * <p>
+    * A confirmed VPN range stays a VPN range for far longer than "this address looked clean five
+    * minutes ago" stays true, so the two are cached on different clocks: a longer one for flagged
+    * addresses cuts requests without letting a wrongly flagged player wait out the default TTL.
+    */
+   public void put(K key, V value, long customTtlMillis) {
       lock.lock();
       try {
-         entries.put(key, new Entry<>(value, System.currentTimeMillis() + ttlMillis));
+         entries.put(key, new Entry<>(value,
+               System.currentTimeMillis() + Math.max(1L, customTtlMillis)));
          evictIfNeeded();
+      } finally {
+         lock.unlock();
+      }
+   }
+
+   /** Restores an entry that already carries an absolute expiry, used by the on-disk cache. */
+   public void putWithExpiry(K key, V value, long expiresAt) {
+      if (expiresAt <= System.currentTimeMillis()) {
+         return;
+      }
+      lock.lock();
+      try {
+         entries.put(key, new Entry<>(value, expiresAt));
+         evictIfNeeded();
+      } finally {
+         lock.unlock();
+      }
+   }
+
+   /** A copy of the live entries with their absolute expiry, for writing the cache to disk. */
+   public Map<K, Long> expirySnapshot() {
+      lock.lock();
+      try {
+         Map<K, Long> out = new LinkedHashMap<>(entries.size());
+         for (Map.Entry<K, Entry<V>> entry : entries.entrySet()) {
+            if (!entry.getValue().isExpired()) {
+               out.put(entry.getKey(), entry.getValue().expiresAt());
+            }
+         }
+         return out;
+      } finally {
+         lock.unlock();
+      }
+   }
+
+   /** The live value for a key without counting a hit or a miss. */
+   public V peek(K key) {
+      lock.lock();
+      try {
+         Entry<V> entry = entries.get(key);
+         return entry == null || entry.isExpired() ? null : entry.value;
       } finally {
          lock.unlock();
       }

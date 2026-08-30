@@ -6,6 +6,9 @@ author: LucasTHCR
 description: Anti-VPN and anti-proxy protection for Folia, with country filtering, webhook alerts and a silent mode.
 folia-supported: true
 
+# Optional: the placeholder expansion registers itself when PlaceholderAPI is installed.
+softdepend: [PlaceholderAPI]
+
 commands:
   proxyshield:
     description: Manage ProxyShield.

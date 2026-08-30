@@ -7,7 +7,7 @@
     <parent>
         <groupId>de.lucasthcr.bridgesave</groupId>
         <artifactId>proxyshield-parent</artifactId>
-        <version>2.1</version>
+        <version>2.2</version>
     </parent>
 
     <artifactId>proxyshield-bungee</artifactId>
@@ -17,6 +17,10 @@
         <dependency>
             <groupId>de.lucasthcr.bridgesave</groupId>
             <artifactId>proxyshield-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.bstats</groupId>
+            <artifactId>bstats-bungeecord</artifactId>
         </dependency>
         <dependency>
             <groupId>net.md-5</groupId>
@@ -47,8 +51,19 @@
                             <artifactSet>
                                 <includes>
                                     <include>de.lucasthcr.bridgesave:proxyshield-common</include>
+                                    <include>org.bstats:*</include>
                                 </includes>
                             </artifactSet>
+                            <relocations>
+                                <!--
+                                  bStats requires relocation: two plugins shipping the same
+                                  unrelocated copy fight over one class on a shared classpath.
+                                -->
+                                <relocation>
+                                    <pattern>org.bstats</pattern>
+                                    <shadedPattern>de.lucasthcr.bridgesave.proxyshield.bstats</shadedPattern>
+                                </relocation>
+                            </relocations>
                         </configuration>
                     </execution>
                 </executions>

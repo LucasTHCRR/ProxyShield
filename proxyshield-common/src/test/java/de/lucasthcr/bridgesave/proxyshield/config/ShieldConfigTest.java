@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.lucasthcr.bridgesave.proxyshield.lookup.ProviderDefinition;
 import de.lucasthcr.bridgesave.proxyshield.net.IpRangeSet;
 import de.lucasthcr.bridgesave.proxyshield.testing.MapConfigNode;
 import java.io.InputStream;
@@ -84,12 +85,14 @@ class ShieldConfigTest {
 
    @Test
    void apiTemplatesCarryTheIpPlaceholder() {
-      List<String> providers = shipped.activeApiProviders();
+      List<ProviderDefinition> providers = shipped.providers();
 
-      assertFalse(providers.isEmpty(), "at least one lookup provider must be configured");
-      for (String provider : providers) {
-         assertTrue(provider.contains("{ip}"),
-               provider + " has no {ip}, so every lookup would query the same address");
+      assertFalse(providers.isEmpty(), "at least one lookup provider must be enabled");
+      for (ProviderDefinition provider : providers) {
+         assertTrue(provider.urlTemplate().contains("{ip}"),
+               provider.id() + " has no {ip}, so every lookup would query the same address");
+         assertFalse(provider.keyRequired(),
+               provider.id() + " is enabled by default but needs a key nobody has yet");
       }
       assertEquals(45, shipped.apiRateLimitPerMinute(), "must match the free tier limit");
    }

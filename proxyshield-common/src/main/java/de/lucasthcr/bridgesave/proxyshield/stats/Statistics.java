@@ -14,6 +14,8 @@ public final class Statistics {
    private final AtomicLong wouldHaveBlocked = new AtomicLong();
    private final Map<CheckVerdict.Reason, AtomicLong> byReason =
          new EnumMap<>(CheckVerdict.Reason.class);
+   private final AtomicLong blockedAtLastReport = new AtomicLong();
+   private final AtomicLong lookupsAtLastReport = new AtomicLong();
 
    public Statistics() {
       for (CheckVerdict.Reason reason : CheckVerdict.Reason.values()) {
@@ -50,6 +52,24 @@ public final class Statistics {
       return byReason.get(reason).get();
    }
 
+   /**
+    * Blocks since the last call, for the metrics line chart.
+    * <p>
+    * bStats plots what it is given, so a running total would draw an ever-rising line that says
+    * nothing about how much the plugin is actually doing right now.
+    */
+   public int drainBlockedSinceReport() {
+      long total = blocked.get() + wouldHaveBlocked.get();
+      long previous = blockedAtLastReport.getAndSet(total);
+      return (int) Math.max(0L, total - previous);
+   }
+
+   /** Lookups since the last call, given the lookup service's running total. */
+   public int drainLookupsSinceReport(long totalLookups) {
+      long previous = lookupsAtLastReport.getAndSet(totalLookups);
+      return (int) Math.max(0L, totalLookups - previous);
+   }
+
    public long uptimeMillis() {
       return System.currentTimeMillis() - startedAt;
    }
@@ -71,6 +91,8 @@ public final class Statistics {
 
    public void reset() {
       checked.set(0);
+      blockedAtLastReport.set(0);
+      lookupsAtLastReport.set(0);
       blocked.set(0);
       wouldHaveBlocked.set(0);
       byReason.values().forEach(counter -> counter.set(0));

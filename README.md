@@ -53,10 +53,16 @@ address.
 
 **Detection**
 
-- Public VPN and proxy IP feeds with correct CIDR matching, IPv4 and IPv6
-- Live provider lookup for proxy, VPN, Tor and datacenter flags, with failover across providers
+- 26 IP intelligence services built in, enabled by name — 15 of them need no API key at all
+- Consensus scoring: several providers are asked at once and their weights added up, so one service
+  that has never heard of a VPN cannot clear it, and one noisy service cannot kick anybody alone
+- Public VPN, datacenter and Tor exit feeds with correct CIDR matching, IPv4 and IPv6
+- Network (ASN) block and allow rules, which catch a VPN's new range before any feed lists it
+- Reverse DNS patterns as a signal — free, unlimited, and effective on ranges nobody has catalogued
+- Behavioural heuristics: join rate per subnet, accounts per address, an account changing country
+- Trust for regulars, so a tightened rule or a provider having a bad day does not kick your players
 - Country filtering, blacklist or whitelist mode
-- Manual blacklist, checked before the feeds and the provider
+- Manual blacklist, checked before everything else
 - Configurable fail-open or fail-closed behaviour when a check cannot complete
 
 **Exemptions**
@@ -70,6 +76,10 @@ address.
 **Operations**
 
 - Dry-run mode: detect and report without disconnecting anybody
+- `/proxyshield check` shows what every single provider said, so a false positive can be traced
+- Lookup cache survives restarts and reloads; simultaneous logins from one address share one query
+- Shared storage for a network: MySQL, MariaDB, PostgreSQL, SQLite, H2 or Redis
+- PlaceholderAPI support and anonymous bStats metrics
 - Silent mode: no staff or console alerts, while the log file and webhook keep recording
 - Discord webhook with queueing, retry and rate-limit handling
 - Block log at `plugins/ProxyShield/blocks.log`
@@ -87,6 +97,34 @@ address.
 Recommended first run: leave `detection.dry-run: true` for a day and watch `blocks.log`. It records
 what *would* have been blocked without disconnecting anybody, which is the cheapest way to find false
 positives before they hit real players.
+
+### Providers and scoring
+
+Enable a service by name. The fifteen listed as free need no key at all:
+
+```yaml
+api:
+  mode: consensus          # or failover
+  required-score: 1.5
+  providers:
+    ip-api:     { enabled: true, weight: 1.0 }
+    blackbox:   { enabled: true, weight: 1.0 }
+    ipapi-is:   { enabled: true, weight: 1.5 }
+    proxycheck: { enabled: false, weight: 2.0, key: "" }
+```
+
+In consensus mode every enabled provider is asked at once and the weights of those flagging the
+address are added up. At `required-score: 1.5` a single strong provider is enough, or any two weaker
+ones, or one weak provider plus a reverse DNS hit. Raise it to 2.5 if you would rather miss a VPN
+than kick a real player; lower it to 1.0 to block on any single hit.
+
+This does not multiply your quota the way it looks. Answers are cached (IPv6 folded to its /64),
+simultaneous logins from one address share one lookup, the fan-out stops the moment the score is
+reached, the cache survives restarts and reloads, and a provider that starts failing is dropped from
+the rotation until it recovers.
+
+A service the catalog does not know can be described directly in `config.yml` with a URL and dotted
+field paths — see the commented example at the bottom of the `providers` section.
 
 ### Country filtering
 
@@ -122,6 +160,67 @@ discord:
 
 `show-ip: false` posts `hidden` instead of the address. Only `https://` URLs are accepted.
 
+### Storage on a network
+
+One server needs no setup — verdicts and trust live in two files. A network of several proxies
+should share them, so each address is looked up once for the whole network instead of once per
+proxy:
+
+```yaml
+storage:
+  type: redis            # or mysql, mariadb, postgresql, sqlite, h2, file, memory
+  redis:
+    host: "127.0.0.1"
+    port: 6379
+    password: ""
+```
+
+Redis also pushes invalidations: whitelisting an address or running `/proxyshield clearcache` on one
+proxy takes effect on the others immediately, rather than when the entry expires.
+
+ProxyShield bundles no database driver and no Redis library, so nothing is relocated into a server
+that did not ask for it. Most Bukkit servers already have a MySQL and a SQLite driver; if yours does
+not, drop the driver jar into the ProxyShield folder and name it under `storage.sql.driver-path`. If
+the store cannot be reached, the plugin says so once and falls back to file storage — a database
+outage never becomes a login outage.
+
+### PlaceholderAPI
+
+Available on the Bukkit builds when PlaceholderAPI is installed. Every placeholder reads the cache,
+so none of them can stall the main thread:
+
+| Placeholder | Shows |
+|---|---|
+| `%proxyshield_blocked%` / `%proxyshield_checked%` | Counters since start-up |
+| `%proxyshield_blocked_proxy%` / `%proxyshield_blocked_hosting%` / `%proxyshield_blocked_country%` | Blocks by reason |
+| `%proxyshield_country%` / `%proxyshield_isp%` / `%proxyshield_asn%` | The player's own address |
+| `%proxyshield_is_proxy%` / `%proxyshield_is_hosting%` / `%proxyshield_score%` | The verdict on it |
+| `%proxyshield_sources%` | Which services flagged it |
+| `%proxyshield_trusted%` | Whether the player has earned an exemption |
+| `%proxyshield_mode%` / `%proxyshield_providers%` / `%proxyshield_storage%` | How the plugin is set up |
+| `%proxyshield_cache_size%` / `%proxyshield_trusted_players%` / `%proxyshield_uptime%` | Live state |
+
+### Metrics
+
+Anonymous statistics through bStats: server count, platform, Java version and which ProxyShield
+settings are in use. No addresses and no player data. Public at
+[bstats.org](https://bstats.org/plugin/bukkit/ProxyShield/33736), and switched off with
+`metrics.enabled: false`.
+
+### API for other plugins
+
+```java
+if (ProxyShieldApi.isAvailable() && ProxyShieldApi.isProxy(address)) {
+    // cache-only, safe on the main thread
+}
+
+LookupResult result = ProxyShieldApi.lookup(address);   // blocking, async only
+boolean regular = ProxyShieldApi.isTrusted(uuid);
+```
+
+`de.lucasthcr.bridgesave.proxyshield.api.ProxyShieldApi` is read-only: it answers questions, it never
+changes a verdict or disconnects anybody.
+
 ### Language
 
 All player facing text lives in `messages_en.yml` and `messages_de.yml`. Point `settings.language` at
@@ -137,7 +236,8 @@ All of these need `proxyshield.admin`. Aliases: `/ps`, `/antivpn`.
 
 | Command | Does |
 |---|---|
-| `/proxyshield info` | Version, active mode and list status |
+| `/proxyshield info` | Version, active mode, lookup mode and list status |
+| `/proxyshield providers` | Every enabled service with its weight, health and latency |
 | `/proxyshield stats` | Detection counters, cache and webhook state |
 | `/proxyshield check <player\|ip>` | Runs the full pipeline and explains the verdict |
 | `/proxyshield lookup <player\|ip>` | Fresh provider lookup, ignoring the cache |

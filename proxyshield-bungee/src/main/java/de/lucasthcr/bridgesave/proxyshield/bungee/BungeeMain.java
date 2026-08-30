@@ -3,6 +3,7 @@ package de.lucasthcr.bridgesave.proxyshield.bungee;
 import de.lucasthcr.bridgesave.proxyshield.ProxyShieldCore;
 import de.lucasthcr.bridgesave.proxyshield.check.CheckEngine;
 import de.lucasthcr.bridgesave.proxyshield.command.CommandHandler;
+import de.lucasthcr.bridgesave.proxyshield.metrics.MetricsData;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import net.md_5.bungee.api.CommandSender;
@@ -36,6 +37,7 @@ public final class BungeeMain extends Plugin implements Listener {
       core.start();
       commands = new CommandHandler(core);
 
+      startMetrics();
       getProxy().getPluginManager().registerListener(this, this);
       getProxy().getPluginManager().registerCommand(this, new ShieldCommand());
    }
@@ -44,6 +46,31 @@ public final class BungeeMain extends Plugin implements Listener {
    public void onDisable() {
       if (core != null) {
          core.shutdown();
+      }
+   }
+
+   /**
+    * Starts bStats when it is switched on and an id is configured.
+    * <p>
+    * bStats ids are per platform, so the BungeeCord project has its own; without one configured
+    * there is nothing to report to, and starting anyway would only produce errors in the log.
+    */
+   private void startMetrics() {
+      int id = core.config().metricsPluginId();
+      if (!core.config().metricsEnabled() || id <= 0) {
+         return;
+      }
+      try {
+         org.bstats.bungeecord.Metrics metrics = new org.bstats.bungeecord.Metrics(this, id);
+         MetricsData.pies(core).forEach((chart, value) ->
+               metrics.addCustomChart(new org.bstats.charts.SimplePie(chart,
+                     () -> MetricsData.pies(core).get(chart))));
+         metrics.addCustomChart(new org.bstats.charts.SingleLineChart("connections_blocked",
+               () -> MetricsData.blockedSinceLastReport(core)));
+         metrics.addCustomChart(new org.bstats.charts.SingleLineChart("lookups_performed",
+               () -> MetricsData.lookupsSinceLastReport(core)));
+      } catch (Throwable unavailable) {
+         getLogger().info("bStats metrics are not available: " + unavailable.getMessage());
       }
    }
 

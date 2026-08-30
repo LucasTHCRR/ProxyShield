@@ -33,7 +33,7 @@ import java.util.zip.GZIPInputStream;
  */
 public final class ListManager {
 
-   private static final String USER_AGENT = "ProxyShield/2.1 (+https://modrinth.com)";
+   private static final String USER_AGENT = "ProxyShield/2.2 (+https://modrinth.com)";
 
    /**
     * How hard to try, and how long to wait between attempts.

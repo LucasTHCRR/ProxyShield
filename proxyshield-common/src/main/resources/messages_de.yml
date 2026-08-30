@@ -54,6 +54,15 @@ info-country-on: "&7Laendersperre: &f{mode} &8[&f{codes}&8] &7unbekannt={unknown
 info-lists: "&7VPN-Bereiche: &f{ranges} &7aus &f{ok}&7/&f{total} &7Quelle(n)"
 info-managed: "&7Whitelist: &f{whitelist} &8| &7Blacklist: &f{blacklist} &7Bereich(e)"
 info-provider: "&7Anbieter: &f{provider} &8| &7Bei Fehlern: {failmode}"
+info-lookup-mode: "&7Modus: &f{mode} &8| &7noetiger Score: &f{score} &8| &7aktive Anbieter: &f{count}"
+info-storage: "&7Speicher: &f{storage} &8| &7mit anderen Servern geteilt: {shared}"
+info-signals: "&7Signale: &7ASN {asn} &8| &7rDNS {rdns} &8| &7Verhalten {heuristics} &8| &7Vertrauen {trust}"
+
+providers-header: "&8&m--------&r &c&lProxyShield Anbieter &8&m--------"
+providers-line: "&8» &f{id} &8(&7{host}&8) &7Gewicht &f{weight} &8| {status} &8| &7{queries} Abfragen, &f{failures} &7fehlgeschlagen, &f{latency}ms"
+providers-none: "&cKein Anbieter ist aktiv. Aktiviere welche unter api.providers."
+provider-status-ok: "&aok"
+provider-status-tripped: "&cpausiert"
 
 # --- /proxyshield stats ---
 stats-header: "&8&m--------&r &c&lProxyShield Statistik &8&m--------"
@@ -63,6 +72,7 @@ stats-blocked: "&7Blockiert: &c{blocked}{dryrun}"
 stats-reasons-1: "&7 &8• &7Liste: &f{list} &8• &7Proxy: &f{proxy} &8• &7Hosting: &f{hosting}"
 stats-reasons-2: "&7 &8• &7Land: &f{country} &8• &7Blacklist: &f{blacklist} &8• &7Fehlgeschlagen: &f{failed}"
 stats-allowed: "&7Durchgelassen per Bypass: &f{bypass} &8• &7per Whitelist: &f{whitelist}"
+stats-efficiency: "&7Gespart: &f{coalesced} &7geteilte Abfragen &8| &7Zeit ueberschritten: &f{budget} &8| &7vertraute Spieler: &f{trusted}"
 stats-lookups: "&7Abfragen: &f{lookups} &8| &7Cache: &f{cachesize}&7, &f{cachehits} &7Treffer &8| &7gedrosselt: &f{limited} &8| &7fehlgeschlagen: &f{failed}"
 stats-webhook: "&7Webhook: &f{sent} &7gesendet, &f{dropped} &7verworfen, &f{queued} &7in Warteschlange"
 
@@ -95,6 +105,9 @@ check-verdict-blocked: "&7Ergebnis: &cBLOCKIERT &8- &f{reason}"
 check-country: "&7Land: &f{code} &8(&f{name}&8)"
 check-isp: "&7Anbieter: &f{isp}"
 check-flags: "&7Proxy: {proxy} &8| &7Hosting: {hosting}"
+check-score: "&7Score: &f{score}&7/&f{required} &8| &7Signale: &f{signals}"
+check-provider-header: "&7Pro Anbieter:"
+check-provider-line: "&8  » &f{id} &8(&7w{weight}&8): {verdict} &8| &7{detail}"
 check-unresolved: "&7Anbieterdaten: &7nicht verfuegbar &8(&f{error}&8)"
 check-lists: "&7Auf Liste: {list} &8| &7Whitelist: {whitelist} &8| &7Blacklist: {blacklist}"
 check-dry-run-note: "&6Testlauf ist aktiv, dieser Spieler wuerde also trotzdem durchgelassen."
@@ -102,6 +115,7 @@ check-dry-run-note: "&6Testlauf ist aktiv, dieser Spieler wuerde also trotzdem d
 # --- /proxyshield lookup ---
 lookup-start: "{prefix}&7Frage den Anbieter zu &f{ip} &7ab…"
 lookup-failed: "{prefix}&cAbfrage fehlgeschlagen: &f{error}"
+lookup-details: "&7ASN &f{asn} &8| &7Typ &f{type} &8| &7Score &f{score} &8| &7gemeldet von &f{sources}"
 lookup-result: "&7{ip} &8→ &7Land &f{country} &8| &7Proxy {proxy} &8| &7Hosting {hosting} &8| &7Anbieter &f{isp}"
 
 # --- /proxyshield whitelist und blacklist ---

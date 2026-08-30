@@ -68,6 +68,7 @@ class FailoverLookupServiceTest {
       Map<String, Object> values = new LinkedHashMap<>();
       values.put("api.providers", providers);
       values.put("api.timeout-seconds", 5);
+      values.put("api.mode", "failover");
       return new FailoverLookupService(platform, ShieldConfig.from(new MapConfigNode(values)));
    }
 

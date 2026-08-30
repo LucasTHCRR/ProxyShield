@@ -186,6 +186,104 @@ public final class Json {
       return false;
    }
 
+   /**
+    * Follows a dotted path through nested objects, e.g. {@code security.vpn}.
+    * <p>
+    * Providers disagree about where the interesting flag lives: ip-api.com puts {@code proxy} at
+    * the top level, vpnapi.io nests it under {@code security}, iplocate.io under {@code privacy}
+    * and ipquery.io under {@code risk}. A path lets the provider catalog describe that difference
+    * as data instead of one parser branch per provider.
+    *
+    * @return the value at that path, or {@code null} if any segment is missing
+    */
+   public static Object path(Object root, String dottedPath) {
+      if (root == null || dottedPath == null || dottedPath.isBlank()) {
+         return null;
+      }
+
+      Object current = root;
+      int start = 0;
+      while (start <= dottedPath.length()) {
+         int dot = dottedPath.indexOf('.', start);
+         String key = dot < 0 ? dottedPath.substring(start) : dottedPath.substring(start, dot);
+         if (!(current instanceof Map<?, ?> map)) {
+            return null;
+         }
+         current = map.get(key);
+         if (dot < 0) {
+            return current;
+         }
+         if (current == null) {
+            return null;
+         }
+         start = dot + 1;
+      }
+      return current;
+   }
+
+   /** {@link #path(Object, String)} rendered as a string, or {@code null}. */
+   public static String stringAt(Object root, String dottedPath) {
+      Object value = path(root, dottedPath);
+      if (value == null) {
+         return null;
+      }
+      if (value instanceof Double number && number == Math.floor(number)
+            && !number.isInfinite()) {
+         return String.valueOf(number.longValue());
+      }
+      return String.valueOf(value);
+   }
+
+   /**
+    * Reads a value as a number, accepting the string spellings providers use.
+    * <p>
+    * getipintel.net returns its probability as {@code "0.99"} — a JSON string, not a number — and
+    * reading that as a boolean silently yields {@code false}, letting the proxy straight through.
+    */
+   public static Double numberAt(Object root, String dottedPath) {
+      Object value = path(root, dottedPath);
+      if (value instanceof Number number) {
+         return number.doubleValue();
+      }
+      if (value instanceof Boolean flag) {
+         return flag ? 1.0 : 0.0;
+      }
+      if (value instanceof String text) {
+         try {
+            return Double.valueOf(text.trim());
+         } catch (NumberFormatException notANumber) {
+            return null;
+         }
+      }
+      return null;
+   }
+
+   /**
+    * Reads a flag at a dotted path, accepting every spelling seen in the wild.
+    * <p>
+    * Real JSON booleans (ip-api.com), {@code "yes"} / {@code "no"} (proxycheck.io), {@code 1} /
+    * {@code 0} (iphub.info) and {@code "Y"} (blackbox) all mean the same thing.
+    */
+   public static boolean boolAt(Object root, String dottedPath) {
+      return truthy(path(root, dottedPath));
+   }
+
+   /** Whether a parsed JSON value means "yes". */
+   public static boolean truthy(Object value) {
+      if (value instanceof Boolean flag) {
+         return flag;
+      }
+      if (value instanceof Number number) {
+         return number.doubleValue() != 0.0;
+      }
+      if (value instanceof String text) {
+         String normalized = text.trim().toLowerCase(java.util.Locale.ROOT);
+         return normalized.equals("true") || normalized.equals("yes") || normalized.equals("y")
+               || normalized.equals("1");
+      }
+      return false;
+   }
+
    public static final class JsonException extends RuntimeException {
       public JsonException(String message) {
          super(message);

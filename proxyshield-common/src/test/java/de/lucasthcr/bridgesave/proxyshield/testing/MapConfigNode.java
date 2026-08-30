@@ -45,6 +45,31 @@ public final class MapConfigNode implements ConfigNode {
    }
 
    @Override
+   public double getDouble(String path, double def) {
+      Object value = values.get(path);
+      return value instanceof Number number ? number.doubleValue() : def;
+   }
+
+   /** Derives the child keys from the dotted keys already present in the map. */
+   @Override
+   public List<String> getKeys(String path) {
+      String prefix = path.endsWith(".") ? path : path + ".";
+      List<String> out = new ArrayList<>();
+      for (String key : values.keySet()) {
+         if (!key.startsWith(prefix)) {
+            continue;
+         }
+         String remainder = key.substring(prefix.length());
+         int dot = remainder.indexOf('.');
+         String child = dot < 0 ? remainder : remainder.substring(0, dot);
+         if (!child.isEmpty() && !out.contains(child)) {
+            out.add(child);
+         }
+      }
+      return out;
+   }
+
+   @Override
    public List<String> getStringList(String path) {
       Object value = values.get(path);
       if (!(value instanceof List<?> list)) {

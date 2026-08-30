@@ -54,6 +54,15 @@ info-country-on: "&7Country filter: &f{mode} &8[&f{codes}&8] &7unknown={unknown}
 info-lists: "&7VPN ranges: &f{ranges} &7from &f{ok}&7/&f{total} &7source(s)"
 info-managed: "&7Whitelist: &f{whitelist} &8| &7Blacklist: &f{blacklist} &7range(s)"
 info-provider: "&7Provider: &f{provider} &8| &7Fail policy: {failmode}"
+info-lookup-mode: "&7Mode: &f{mode} &8| &7required score: &f{score} &8| &7active providers: &f{count}"
+info-storage: "&7Storage: &f{storage} &8| &7shared with other servers: {shared}"
+info-signals: "&7Signals: &7ASN {asn} &8| &7rDNS {rdns} &8| &7behaviour {heuristics} &8| &7trust {trust}"
+
+providers-header: "&8&m--------&r &c&lProxyShield Providers &8&m--------"
+providers-line: "&8» &f{id} &8(&7{host}&8) &7weight &f{weight} &8| {status} &8| &7{queries} queries, &f{failures} &7failed, &f{latency}ms"
+providers-none: "&cNo lookup provider is enabled. Turn some on under api.providers."
+provider-status-ok: "&aok"
+provider-status-tripped: "&cin cooldown"
 
 # --- /proxyshield stats ---
 stats-header: "&8&m--------&r &c&lProxyShield Stats &8&m--------"
@@ -63,6 +72,7 @@ stats-blocked: "&7Blocked: &c{blocked}{dryrun}"
 stats-reasons-1: "&7 &8• &7List: &f{list} &8• &7Proxy: &f{proxy} &8• &7Hosting: &f{hosting}"
 stats-reasons-2: "&7 &8• &7Country: &f{country} &8• &7Blacklist: &f{blacklist} &8• &7Failed: &f{failed}"
 stats-allowed: "&7Allowed by bypass: &f{bypass} &8• &7by whitelist: &f{whitelist}"
+stats-efficiency: "&7Saved: &f{coalesced} &7shared lookups &8| &7timed out: &f{budget} &8| &7trusted players: &f{trusted}"
 stats-lookups: "&7Lookups: &f{lookups} &8| &7cache: &f{cachesize}&7, &f{cachehits} &7hits &8| &7limited: &f{limited} &8| &7failed: &f{failed}"
 stats-webhook: "&7Webhook: &f{sent} &7sent, &f{dropped} &7dropped, &f{queued} &7queued"
 
@@ -95,6 +105,9 @@ check-verdict-blocked: "&7Verdict: &cBLOCKED &8- &f{reason}"
 check-country: "&7Country: &f{code} &8(&f{name}&8)"
 check-isp: "&7ISP: &f{isp}"
 check-flags: "&7Proxy: {proxy} &8| &7Hosting: {hosting}"
+check-score: "&7Score: &f{score}&7/&f{required} &8| &7signals: &f{signals}"
+check-provider-header: "&7Per provider:"
+check-provider-line: "&8  » &f{id} &8(&7w{weight}&8): {verdict} &8| &7{detail}"
 check-unresolved: "&7Provider data: &7unavailable &8(&f{error}&8)"
 check-lists: "&7On list: {list} &8| &7Whitelisted: {whitelist} &8| &7Blacklisted: {blacklist}"
 check-dry-run-note: "&6Dry-run is on, so this player would still be let through."
@@ -102,6 +115,7 @@ check-dry-run-note: "&6Dry-run is on, so this player would still be let through.
 # --- /proxyshield lookup ---
 lookup-start: "{prefix}&7Querying the provider for &f{ip}&7…"
 lookup-failed: "{prefix}&cLookup failed: &f{error}"
+lookup-details: "&7ASN &f{asn} &8| &7type &f{type} &8| &7score &f{score} &8| &7flagged by &f{sources}"
 lookup-result: "&7{ip} &8→ &7country &f{country} &8| &7proxy {proxy} &8| &7hosting {hosting} &8| &7isp &f{isp}"
 
 # --- /proxyshield whitelist and blacklist ---

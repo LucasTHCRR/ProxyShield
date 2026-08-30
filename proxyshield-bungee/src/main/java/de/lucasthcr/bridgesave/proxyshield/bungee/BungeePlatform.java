@@ -108,6 +108,17 @@ final class BungeePlatform implements Platform {
          public List<String> getStringList(String path) {
             return configuration.getStringList(path);
          }
+
+         @Override
+         public double getDouble(String path, double def) {
+            return configuration.getDouble(path, def);
+         }
+
+         @Override
+         public List<String> getKeys(String path) {
+            Configuration section = configuration.getSection(path);
+            return section == null ? List.of() : new ArrayList<>(section.getKeys());
+         }
       };
    }
 

@@ -4,6 +4,8 @@ import com.google.inject.Inject;
 import de.lucasthcr.bridgesave.proxyshield.ProxyShieldCore;
 import de.lucasthcr.bridgesave.proxyshield.check.CheckEngine;
 import de.lucasthcr.bridgesave.proxyshield.command.CommandHandler;
+import de.lucasthcr.bridgesave.proxyshield.metrics.MetricsData;
+import org.bstats.sponge.Metrics;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -49,6 +51,9 @@ public final class SpongeMain {
    private CommandHandler commands;
 
    @Inject
+   private Metrics.Factory metricsFactory;
+
+   @Inject
    public SpongeMain(PluginContainer container, Game game, Logger logger,
          @ConfigDir(sharedRoot = false) Path configDirectory) {
       this.container = container;
@@ -75,6 +80,32 @@ public final class SpongeMain {
    @Listener
    public void onStarted(StartedEngineEvent<Server> event) {
       core.start();
+      startMetrics();
+   }
+
+   /**
+    * Starts bStats when it is switched on and an id is configured.
+    * <p>
+    * bStats ids are per platform, so the Sponge project has its own; without one configured there
+    * is nothing to report to.
+    */
+   private void startMetrics() {
+      int id = core.config().metricsPluginId();
+      if (!core.config().metricsEnabled() || id <= 0 || metricsFactory == null) {
+         return;
+      }
+      try {
+         Metrics metrics = metricsFactory.make(id);
+         MetricsData.pies(core).forEach((chart, value) ->
+               metrics.addCustomChart(new org.bstats.charts.SimplePie(chart,
+                     () -> MetricsData.pies(core).get(chart))));
+         metrics.addCustomChart(new org.bstats.charts.SingleLineChart("connections_blocked",
+               () -> MetricsData.blockedSinceLastReport(core)));
+         metrics.addCustomChart(new org.bstats.charts.SingleLineChart("lookups_performed",
+               () -> MetricsData.lookupsSinceLastReport(core)));
+      } catch (Throwable unavailable) {
+         logger.info("bStats metrics are not available: " + unavailable.getMessage());
+      }
    }
 
    @Listener

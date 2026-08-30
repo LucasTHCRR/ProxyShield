@@ -4,6 +4,8 @@ import de.lucasthcr.bridgesave.proxyshield.ProxyShieldCore;
 import de.lucasthcr.bridgesave.proxyshield.check.CheckEngine;
 import de.lucasthcr.bridgesave.proxyshield.check.CheckVerdict;
 import de.lucasthcr.bridgesave.proxyshield.config.ShieldConfig;
+import de.lucasthcr.bridgesave.proxyshield.lookup.FailoverLookupService;
+import de.lucasthcr.bridgesave.proxyshield.lookup.IpLookupService;
 import de.lucasthcr.bridgesave.proxyshield.lookup.LookupResult;
 import de.lucasthcr.bridgesave.proxyshield.message.Messages;
 import de.lucasthcr.bridgesave.proxyshield.net.IpAddresses;
@@ -29,7 +31,7 @@ public final class CommandHandler {
    public static final String PERMISSION = "proxyshield.admin";
 
    private static final List<String> SUBCOMMANDS = List.of(
-         "help", "info", "reload", "stats", "check", "lookup", "refresh", "recheck",
+         "help", "info", "providers", "reload", "stats", "check", "lookup", "refresh", "recheck",
          "whitelist", "blacklist", "clearcache", "dryrun", "silent");
 
    private static final List<String> LIST_ACTIONS = List.of("add", "remove", "list");
@@ -82,6 +84,7 @@ public final class CommandHandler {
       switch (args[0].toLowerCase(Locale.ROOT)) {
          case "help" -> sendHelp(sender);
          case "info" -> sendInfo(sender);
+         case "providers" -> sendProviders(sender);
          case "stats" -> sendStats(sender);
          case "reload" -> doReload(sender);
          case "refresh" -> doRefresh(sender);
@@ -191,6 +194,41 @@ public final class CommandHandler {
             "provider", core.lookups().primaryHost()
                   + " (+" + Math.max(0, core.lookups().providerCount() - 1) + ")",
             "failmode", m.get(config.failClosed() ? "fail-closed" : "fail-open")));
+      send(sender, "info-lookup-mode", of(
+            "mode", config.lookupMode().name().toLowerCase(Locale.ROOT),
+            "score", String.format(Locale.ROOT, "%.1f", config.requiredScore()),
+            "count", String.valueOf(core.lookups().providerCount())));
+      send(sender, "info-storage", of(
+            "storage", core.storage().name(),
+            "shared", onOff(core.storage().shared())));
+      send(sender, "info-signals", of(
+            "asn", onOff(config.asnEnabled()),
+            "rdns", onOff(config.rdnsEnabled()),
+            "heuristics", onOff(config.heuristicsEnabled()),
+            "trust", onOff(config.trustEnabled())));
+   }
+
+   /** One line per configured provider, with its live health. */
+   private void sendProviders(Sender sender) {
+      Messages m = messages();
+      List<IpLookupService> providers = core.lookups().providers();
+      if (providers.isEmpty()) {
+         send(sender, "providers-none");
+         return;
+      }
+
+      send(sender, "providers-header");
+      for (IpLookupService provider : providers) {
+         send(sender, "providers-line", of(
+               "id", provider.id(),
+               "host", provider.host(),
+               "weight", String.format(Locale.ROOT, "%.1f", provider.weight()),
+               "status", m.get(provider.tripped()
+                     ? "provider-status-tripped" : "provider-status-ok"),
+               "queries", String.valueOf(provider.queryCount()),
+               "failures", String.valueOf(provider.failureCount()),
+               "latency", String.valueOf(provider.averageLatencyMillis())));
+      }
    }
 
    private void sendStats(Sender sender) {
@@ -220,6 +258,10 @@ public final class CommandHandler {
             "cachehits", String.valueOf(core.lookups().cacheHits()),
             "limited", String.valueOf(core.lookups().rateLimitedCount()),
             "failed", String.valueOf(core.lookups().failureCount())));
+      send(sender, "stats-efficiency", of(
+            "coalesced", String.valueOf(core.lookups().coalescedCount()),
+            "budget", String.valueOf(core.lookups().budgetExceededCount()),
+            "trusted", String.valueOf(core.trust().size())));
       send(sender, "stats-webhook", of(
             "sent", String.valueOf(core.webhook().sentCount()),
             "dropped", String.valueOf(core.webhook().droppedCount()),
@@ -291,8 +333,10 @@ public final class CommandHandler {
 
       send(sender, "check-start", of("ip", ip));
       core.platform().runAsync(() -> {
+         // Deliberately without the join heuristics: an admin running /proxyshield check is not a
+         // login, and counting it would move the very rate windows the command is meant to report.
          CheckEngine engine = new CheckEngine(core.config(), core.lists(), core.lookups(),
-               core.whitelist(), core.blacklist());
+               core.whitelist(), core.blacklist(), core.reverseDns(), core.trust(), null);
          CheckVerdict verdict = engine.check(target, null, ip, CheckEngine.PermissionProbe.NONE);
          LookupResult lookup = verdict.lookup();
 
@@ -309,6 +353,10 @@ public final class CommandHandler {
             send(sender, "check-flags", of(
                   "proxy", yesNo(lookup.proxy()),
                   "hosting", yesNo(lookup.hosting())));
+            send(sender, "check-score", of(
+                  "score", String.format(Locale.ROOT, "%.1f", lookup.confidence()),
+                  "required", String.format(Locale.ROOT, "%.1f", core.config().requiredScore()),
+                  "signals", lookup.sourceSummary()));
          } else {
             send(sender, "check-unresolved", of("error", String.valueOf(lookup.failureReason())));
          }
@@ -318,10 +366,50 @@ public final class CommandHandler {
                "whitelist", yesNo(core.whitelist().matches(ip)),
                "blacklist", yesNo(core.blacklist().matches(ip))));
 
+         sendProviderBreakdown(sender, ip);
+
          if (verdict.blocked() && core.config().dryRun()) {
             send(sender, "check-dry-run-note");
          }
       });
+   }
+
+   /**
+    * Asks every provider individually and prints what each one said.
+    * <p>
+    * Without this, a false positive report can only be answered with "a provider flagged it", and
+    * an operator has no way to tell which service to drop or down-weight.
+    */
+   private void sendProviderBreakdown(Sender sender, String ip) {
+      List<FailoverLookupService.ProviderAnswer> answers = core.lookups().diagnose(ip);
+      if (answers.isEmpty()) {
+         return;
+      }
+
+      Messages m = messages();
+      send(sender, "check-provider-header");
+      for (FailoverLookupService.ProviderAnswer answer : answers) {
+         LookupResult result = answer.result();
+         String verdict;
+         String detail;
+         if (!result.resolved()) {
+            verdict = yesNo(false);
+            detail = String.valueOf(result.failureReason());
+         } else if (result.proxy() || result.hosting() || result.tor()) {
+            verdict = yesNo(true);
+            detail = (result.proxy() ? "proxy " : "") + (result.hosting() ? "hosting " : "")
+                  + (result.tor() ? "tor" : "");
+         } else {
+            verdict = yesNo(false);
+            detail = "clean";
+         }
+
+         send(sender, "check-provider-line", of(
+               "id", answer.id(),
+               "weight", String.format(Locale.ROOT, "%.1f", answer.weight()),
+               "verdict", verdict,
+               "detail", detail.trim()));
+      }
    }
 
    private void doLookup(Sender sender, String[] args) {
@@ -344,6 +432,11 @@ public final class CommandHandler {
             send(sender, "lookup-failed", of("error", String.valueOf(result.failureReason())));
             return;
          }
+         send(sender, "lookup-details", of(
+               "asn", result.asnOrUnknown(),
+               "type", result.connectionType() == null ? "?" : result.connectionType(),
+               "score", String.format(Locale.ROOT, "%.1f", result.confidence()),
+               "sources", result.sourceSummary()));
          send(sender, "lookup-result", of(
                "ip", ip,
                "country", result.countryOrUnknown(),

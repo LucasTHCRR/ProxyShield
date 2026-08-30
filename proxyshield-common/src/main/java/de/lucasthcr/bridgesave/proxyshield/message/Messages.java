@@ -154,6 +154,15 @@ public final class Messages {
       m.put("info-lists", "&7VPN ranges: &f{ranges} &7from &f{ok}&7/&f{total} &7source(s)");
       m.put("info-managed", "&7Whitelist: &f{whitelist} &8| &7Blacklist: &f{blacklist} &7range(s)");
       m.put("info-provider", "&7Provider: &f{provider} &8| &7Fail policy: {failmode}");
+      m.put("info-lookup-mode", "&7Mode: &f{mode} &8| &7required score: &f{score} &8| &7active providers: &f{count}");
+      m.put("info-storage", "&7Storage: &f{storage} &8| &7shared with other servers: {shared}");
+      m.put("info-signals", "&7Signals: &7ASN {asn} &8| &7rDNS {rdns} &8| &7behaviour {heuristics} &8| &7trust {trust}");
+
+      m.put("providers-header", "&8&m--------&r &c&lProxyShield Providers &8&m--------");
+      m.put("providers-line", "&8» &f{id} &8(&7{host}&8) &7weight &f{weight} &8| {status} &8| &7{queries} queries, &f{failures} &7failed, &f{latency}ms");
+      m.put("providers-none", "&cNo lookup provider is enabled. Turn some on under api.providers.");
+      m.put("provider-status-ok", "&aok");
+      m.put("provider-status-tripped", "&cin cooldown");
 
       m.put("stats-header", "&8&m--------&r &c&lProxyShield Stats &8&m--------");
       m.put("stats-uptime", "&7Uptime: &f{uptime}");
@@ -162,6 +171,7 @@ public final class Messages {
       m.put("stats-reasons-1", "&7 &8• &7List: &f{list} &8• &7Proxy: &f{proxy} &8• &7Hosting: &f{hosting}");
       m.put("stats-reasons-2", "&7 &8• &7Country: &f{country} &8• &7Blacklist: &f{blacklist} &8• &7Failed: &f{failed}");
       m.put("stats-allowed", "&7Allowed by bypass: &f{bypass} &8• &7by whitelist: &f{whitelist}");
+      m.put("stats-efficiency", "&7Saved: &f{coalesced} &7shared lookups &8| &7timed out: &f{budget} &8| &7trusted players: &f{trusted}");
       m.put("stats-lookups", "&7Lookups: &f{lookups} &8| &7cache: &f{cachesize}&7, &f{cachehits} &7hits &8| &7limited: &f{limited} &8| &7failed: &f{failed}");
       m.put("stats-webhook", "&7Webhook: &f{sent} &7sent, &f{dropped} &7dropped, &f{queued} &7queued");
 
@@ -189,12 +199,16 @@ public final class Messages {
       m.put("check-country", "&7Country: &f{code} &8(&f{name}&8)");
       m.put("check-isp", "&7ISP: &f{isp}");
       m.put("check-flags", "&7Proxy: {proxy} &8| &7Hosting: {hosting}");
+      m.put("check-score", "&7Score: &f{score}&7/&f{required} &8| &7signals: &f{signals}");
+      m.put("check-provider-header", "&7Per provider:");
+      m.put("check-provider-line", "&8  » &f{id} &8(&7w{weight}&8): {verdict} &8| &7{detail}");
       m.put("check-unresolved", "&7Provider data: &7unavailable &8(&f{error}&8)");
       m.put("check-lists", "&7On list: {list} &8| &7Whitelisted: {whitelist} &8| &7Blacklisted: {blacklist}");
       m.put("check-dry-run-note", "&6Dry-run is on, so this player would still be let through.");
 
       m.put("lookup-start", "{prefix}&7Querying the provider for &f{ip}&7…");
       m.put("lookup-failed", "{prefix}&cLookup failed: &f{error}");
+      m.put("lookup-details", "&7ASN &f{asn} &8| &7type &f{type} &8| &7score &f{score} &8| &7flagged by &f{sources}");
       m.put("lookup-result", "&7{ip} &8→ &7country &f{country} &8| &7proxy {proxy} &8| &7hosting {hosting} &8| &7isp &f{isp}");
 
       m.put("list-header", "&8&m--------&r &c&l{list} &8&m--------");

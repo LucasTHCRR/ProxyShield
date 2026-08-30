@@ -1,5 +1,105 @@
 # Changelog
 
+## 2.2
+
+The detection layer, rebuilt. v2.1 asked one provider and took the first answer it got; if that
+service had never heard of a particular commercial VPN, the connection was cleared and nothing else
+was consulted. That is the miss this release exists to close.
+
+### Added
+
+- **A catalog of 26 IP intelligence services**, each with its own response layout, enabled by name:
+
+  ```yaml
+  api:
+    providers:
+      ip-api:     { enabled: true, weight: 1.0 }
+      blackbox:   { enabled: true, weight: 1.0 }
+      proxycheck: { enabled: false, weight: 2.0, key: "" }
+  ```
+
+  Free, no key: `ip-api`, `blackbox`, `iprisk`, `ipquery`, `ipapi-is`, `iplocate`, `freeipapi`,
+  `funkemunky`, `negativity`, `fastasfuck`, `zombiebot`, `rayzs`, `marvinmc`, `ip-check`, `zowi`.
+  Key based: `proxycheck`, `ipqualityscore`, `vpnapi`, `iphub`, `iphunter`, `ip2location`,
+  `vpnblocker`, `getipintel`, `antivpn-io`, `2ip`, `abuseipdb`. A keyed service without a key is
+  dropped at start-up with one warning instead of failing on every login.
+- **Consensus mode** (`api.mode`, `api.required-score`). Providers are queried in parallel and their
+  weights added up; the connection is refused once the total reaches the required score. A single
+  blind provider can no longer wave a VPN through, and a single noisy one can no longer kick anybody
+  on its own.
+- **Network (ASN) rules** (`detection.asn`). Address feeds always lag behind a VPN renting a new
+  range; the network number does not, so blocking the ASN catches every address inside it at once.
+  ASNs are normalised across the four spellings providers use (`AS9009`, `9009`, `AS9009 M247 …`).
+- **Reverse DNS as a signal** (`detection.rdns`). Operators name their machines after themselves, so
+  the PTR record catches ranges no feed lists yet, costs no quota and cannot be rate limited. It
+  contributes weight rather than blocking outright, and runs under a hard timeout.
+- **Trust** (`trust`). An account with a history of clean logins stops being re-judged on every
+  connection. Mobile players behind carrier NAT are the ones a hosting block hits hardest, and this
+  is what keeps them online. Never overrides the manual blacklist, and is reset the moment an
+  account is caught behind a proxy.
+- **Behavioural heuristics** (`heuristics`). Join rate per /24, distinct accounts per address and an
+  account changing country within minutes. These catch an attack from a range rented this morning,
+  which by definition appears on no list anywhere.
+- **Tor exit list** as a default feed, and a `detection.block-tor` switch.
+- **Custom providers in config.yml.** Any unlisted service can be described with a URL, dotted field
+  paths, an optional score field and a threshold — no code needed.
+- **On-disk lookup cache** (`api.persist-cache`), so a restart no longer spends its first minutes
+  re-querying addresses the plugin already knew about.
+- `/proxyshield providers` lists every enabled service with its live health, and
+  `/proxyshield check` now prints what each provider individually said about an address.
+- Log rotation for `blocks.log` at 16 MB.
+- **Shared storage for a network** (`storage.type`). Verdicts and trust can live in MySQL,
+  MariaDB, PostgreSQL, SQLite, H2 or Redis instead of a local file, so a network running several
+  proxies pays for each address once rather than once per proxy, and every front end agrees about
+  it. Redis additionally pushes invalidations, so whitelisting an address or clearing the cache on
+  one server takes effect on the others immediately. No driver and no Redis library is bundled —
+  the schema stays in portable SQL and the Redis protocol is spoken directly — so nothing is
+  relocated into a server that did not ask for it. A store that cannot be reached falls back to
+  file storage with one warning; a database outage never becomes a login outage.
+- **bStats metrics** (`metrics`), reporting configuration shape and counters, never addresses or
+  player data. The Bukkit build reports to
+  [ProxyShield/33736](https://bstats.org/plugin/bukkit/ProxyShield/33736); the other platforms need
+  their own id under `metrics.plugin-id`.
+- **PlaceholderAPI support** on the Bukkit builds: `%proxyshield_blocked%`, `%proxyshield_checked%`,
+  `%proxyshield_country%`, `%proxyshield_isp%`, `%proxyshield_asn%`, `%proxyshield_score%`,
+  `%proxyshield_is_proxy%`, `%proxyshield_trusted%`, `%proxyshield_providers%`,
+  `%proxyshield_storage%` and more. Every one reads the cache: placeholders resolve on the main
+  thread, so none of them can perform a lookup.
+- **A read-only API for other plugins**, `ProxyShieldApi`: cache-only `isProxy`/`isHosting` calls
+  that are safe on the main thread, a blocking `lookup`, and `isTrusted`.
+
+### Fixed
+
+- **Nested and numeric responses were silently read as clean.** A flag at `security.vpn`,
+  `privacy.is_vpn` or `risk.is_proxy` was invisible to the flat reader, and getipintel's probability
+  arrives as the JSON string `"0.99"`, which read as a boolean is `false`. Both produced a false
+  negative — a VPN let straight through with no error anywhere.
+- **iphub's `block: 2` counted as a detection.** It means "unclear", not "block", so it kicked
+  players the provider had explicitly declined to judge.
+- **A response carrying none of a provider's documented fields now counts as a failure**, not as a
+  clean address, so an API changing shape surfaces instead of quietly disabling detection.
+- **`/proxyshield reload` threw the whole lookup cache away**, sending the server straight back into
+  the providers' rate limits. The cache is now inherited.
+- **Simultaneous logins from one address each triggered their own lookup.** They now share one.
+- **The rate limiter had a race** between resetting its window and incrementing its counter, which
+  let requests slip past the limit or vanish. Replaced with a token bucket.
+- **A login could stall for the sum of every provider's timeout.** The lookup stage now has one
+  budget (`api.total-timeout-seconds`) and answers with whatever arrived in time.
+- **A dead provider was retried at full timeout on every single login.** A circuit breaker now
+  takes it out of the rotation for two minutes after five consecutive failures.
+- **IPv6 was cached per full address**, so a client rotating the host part inside its own /64 never
+  hit the cache. Both the cache and the rate limiter now work per /64.
+- **Mobile carriers in hosting ranges were kicked.** Where a provider reports the connection type,
+  `detection.allow-residential-hosting` keeps those players online.
+
+### Changed
+
+- Flagged addresses are cached far longer than clean ones (`api.flagged-cache-minutes`): a confirmed
+  VPN range stays one for days, while "looked clean an hour ago" goes stale quickly.
+- Alerts, `blocks.log` and the webhook now record the ASN and which services flagged the address.
+- 178 automated tests, up from 124, including the SQL store against a real database and the Redis
+  client against a server that speaks the actual protocol.
+
 ## 2.1
 
 ### Added

@@ -3,6 +3,7 @@ package de.lucasthcr.bridgesave.proxyshield.paper;
 import de.lucasthcr.bridgesave.proxyshield.ProxyShieldCore;
 import de.lucasthcr.bridgesave.proxyshield.check.CheckEngine;
 import de.lucasthcr.bridgesave.proxyshield.command.CommandHandler;
+import de.lucasthcr.bridgesave.proxyshield.metrics.MetricsData;
 import de.lucasthcr.bridgesave.proxyshield.paper.compat.ServerBridge;
 import java.util.List;
 import org.bukkit.Bukkit;
@@ -32,6 +33,7 @@ public final class PaperMain extends JavaPlugin implements Listener, CommandExec
    private ProxyShieldCore core;
    private CommandHandler commands;
    private ServerBridge bridge;
+   private ShieldPlaceholders placeholders;
 
    @Override
    public void onEnable() {
@@ -41,6 +43,9 @@ public final class PaperMain extends JavaPlugin implements Listener, CommandExec
       core = new ProxyShieldCore(platform);
       core.start();
       commands = new CommandHandler(core);
+
+      startMetrics();
+      placeholders = ShieldPlaceholders.registerIfPresent(this, core);
 
       getServer().getPluginManager().registerEvents(this, this);
       var command = getCommand("proxyshield");
@@ -52,8 +57,38 @@ public final class PaperMain extends JavaPlugin implements Listener, CommandExec
 
    @Override
    public void onDisable() {
+      if (placeholders != null) {
+         placeholders.unregister();
+      }
       if (core != null) {
          core.shutdown();
+      }
+   }
+
+   /**
+    * Starts bStats when the operator left it on.
+    * <p>
+    * Wrapped because the metrics library is optional at runtime: a jar stripped of it, or a
+    * network that blocks the endpoint, must not stop the plugin from protecting the server.
+    */
+   private void startMetrics() {
+      if (!core.config().metricsEnabled()) {
+         return;
+      }
+      try {
+         int id = core.config().metricsPluginId() > 0
+               ? core.config().metricsPluginId()
+               : MetricsData.BUKKIT_PLUGIN_ID;
+         org.bstats.bukkit.Metrics metrics = new org.bstats.bukkit.Metrics(this, id);
+         MetricsData.pies(core).forEach((chart, value) ->
+               metrics.addCustomChart(new org.bstats.charts.SimplePie(chart,
+                     () -> MetricsData.pies(core).get(chart))));
+         metrics.addCustomChart(new org.bstats.charts.SingleLineChart("connections_blocked",
+               () -> MetricsData.blockedSinceLastReport(core)));
+         metrics.addCustomChart(new org.bstats.charts.SingleLineChart("lookups_performed",
+               () -> MetricsData.lookupsSinceLastReport(core)));
+      } catch (Throwable unavailable) {
+         getLogger().info("bStats metrics are not available: " + unavailable.getMessage());
       }
    }
 

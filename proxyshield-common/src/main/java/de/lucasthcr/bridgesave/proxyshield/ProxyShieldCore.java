@@ -1,18 +1,24 @@
 package de.lucasthcr.bridgesave.proxyshield;
 
+import de.lucasthcr.bridgesave.proxyshield.api.ProxyShieldApi;
 import de.lucasthcr.bridgesave.proxyshield.check.CheckEngine;
 import de.lucasthcr.bridgesave.proxyshield.check.CheckVerdict;
+import de.lucasthcr.bridgesave.proxyshield.check.JoinHeuristics;
+import de.lucasthcr.bridgesave.proxyshield.check.TrustStore;
 import de.lucasthcr.bridgesave.proxyshield.config.ShieldConfig;
 import de.lucasthcr.bridgesave.proxyshield.list.ListManager;
 import de.lucasthcr.bridgesave.proxyshield.lookup.LookupResult;
 import de.lucasthcr.bridgesave.proxyshield.message.Messages;
 import de.lucasthcr.bridgesave.proxyshield.lookup.FailoverLookupService;
 import de.lucasthcr.bridgesave.proxyshield.net.ManagedIpList;
+import de.lucasthcr.bridgesave.proxyshield.net.ReverseDns;
 import de.lucasthcr.bridgesave.proxyshield.notify.AlertDispatcher;
 import de.lucasthcr.bridgesave.proxyshield.notify.DiscordWebhook;
 import de.lucasthcr.bridgesave.proxyshield.platform.Platform;
 import de.lucasthcr.bridgesave.proxyshield.platform.ShieldPlayer;
 import de.lucasthcr.bridgesave.proxyshield.stats.Statistics;
+import de.lucasthcr.bridgesave.proxyshield.storage.ShieldStorage;
+import de.lucasthcr.bridgesave.proxyshield.storage.StorageFactory;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -38,6 +44,7 @@ public final class ProxyShieldCore {
    private final ManagedIpList whitelist;
    private final ManagedIpList blacklist;
    private final Statistics statistics = new Statistics();
+   private final JoinHeuristics heuristics = new JoinHeuristics();
 
    private volatile ShieldConfig config;
    private volatile Messages messages;
@@ -45,6 +52,9 @@ public final class ProxyShieldCore {
    private volatile CheckEngine engine;
    private volatile DiscordWebhook webhook;
    private volatile AlertDispatcher alerts;
+   private volatile ReverseDns reverseDns;
+   private volatile ShieldStorage storage;
+   private volatile TrustStore trust;
    private volatile boolean running;
 
    public ProxyShieldCore(Platform platform) {
@@ -60,9 +70,25 @@ public final class ProxyShieldCore {
       config = ShieldConfig.from(platform.loadConfig());
       messages = Messages.load(platform, config.language());
 
-      lookups = new FailoverLookupService(platform, config);
+      storage = StorageFactory.create(platform, config);
+      trust = new TrustStore(storage);
+      lookups = new FailoverLookupService(platform, config, null, storage);
+      reverseDns = newReverseDns(config);
       webhook = new DiscordWebhook(platform, config);
       alerts = new AlertDispatcher(platform, config, messages, webhook);
+
+      if (config.apiPersistCache()) {
+         lookups.preloadFrom(storage);
+      }
+      // Another server clearing or whitelisting an address has to reach this one immediately,
+      // otherwise every proxy keeps serving its own stale copy until the entry expires.
+      storage.onRemoteInvalidation(key -> lookups.invalidateLocally(key));
+      trust.load();
+
+      if (storage.shared()) {
+         platform.info("Verdicts and trust are shared through " + storage.name()
+               + ", so one lookup now covers every server pointed at it.");
+      }
 
       loadManagedLists();
       rebuildEngine();
@@ -77,12 +103,30 @@ public final class ProxyShieldCore {
       platform.runAsync(this::initialRefresh);
       platform.runAsyncTimer(this::heartbeat, HEARTBEAT_SECONDS);
 
+      ProxyShieldApi.bind(this);
       platform.info("ProxyShield " + platform.version() + " enabled on " + platform.name() + ".");
    }
 
    public void shutdown() {
       running = false;
+      ProxyShieldApi.unbind();
       platform.cancelTasks();
+
+      ShieldConfig current = config;
+      trust.save();
+      if (current != null && current.apiPersistCache()) {
+         storage.flush();
+      }
+      lookups.close();
+      storage.close();
+      if (reverseDns != null) {
+         reverseDns.close();
+      }
+   }
+
+   private ReverseDns newReverseDns(ShieldConfig current) {
+      return new ReverseDns(current.rdnsTimeoutMillis(), current.apiMaxCacheEntries(),
+            current.apiCacheMinutes() * 60_000L);
    }
 
    /**
@@ -120,7 +164,8 @@ public final class ProxyShieldCore {
    }
 
    private void rebuildEngine() {
-      engine = new CheckEngine(config, lists, lookups, whitelist, blacklist);
+      engine = new CheckEngine(config, lists, lookups, whitelist, blacklist, reverseDns, trust,
+            heuristics);
    }
 
    /** Re-reads config.yml and rebuilds everything derived from it. */
@@ -137,8 +182,17 @@ public final class ProxyShieldCore {
       config = updated;
       messages = Messages.load(platform, updated.language());
 
-      // The lookup cache is sized and timed by config, so it has to be rebuilt.
-      lookups = new FailoverLookupService(platform, updated);
+      // Rebuilt because providers, weights and cache sizing all come from config — but the
+      // cached answers carry over, so a reload no longer costs a fresh round of provider quota.
+      FailoverLookupService previousLookups = lookups;
+      lookups = new FailoverLookupService(platform, updated, previousLookups, storage);
+      previousLookups.close();
+
+      ReverseDns previousDns = reverseDns;
+      reverseDns = newReverseDns(updated);
+      if (previousDns != null) {
+         previousDns.close();
+      }
 
       webhook.applyConfig(updated);
       alerts.applyConfig(updated, messages);
@@ -207,6 +261,11 @@ public final class ProxyShieldCore {
       }
 
       lookups.purgeExpired();
+      heuristics.purgeExpired();
+      storage.purgeExpired();
+      storage.flush();
+      trust.saveIfDue();
+      alerts.rotateLogIfLarge();
    }
 
    /** Downloads every configured list source. Blocking; always call from an async context. */
@@ -247,6 +306,11 @@ public final class ProxyShieldCore {
 
       if (verdict.blocked()) {
          alerts.alert(playerName, ip, verdict, enforced);
+         // An account caught behind a proxy starts earning its exemption again from scratch.
+         trust.forget(uuid);
+      } else if (current.trustEnabled()
+            && verdict.reason() == CheckVerdict.Reason.ALLOWED) {
+         trust.recordCleanLogin(uuid);
       }
 
       return new ConnectionDecision(enforced, enforced ? kickMessage(verdict, playerName, ip)
@@ -260,6 +324,7 @@ public final class ProxyShieldCore {
       values.put("reason", verdict.describe());
       values.put("country", verdict.lookup().countryOrUnknown());
       values.put("isp", verdict.lookup().ispOrUnknown());
+      values.put("asn", verdict.lookup().asnOrUnknown());
       return messages.get("kick-message", values);
    }
 
@@ -293,6 +358,22 @@ public final class ProxyShieldCore {
 
    public Statistics statistics() {
       return statistics;
+   }
+
+   public TrustStore trust() {
+      return trust;
+   }
+
+   public JoinHeuristics heuristics() {
+      return heuristics;
+   }
+
+   public ReverseDns reverseDns() {
+      return reverseDns;
+   }
+
+   public ShieldStorage storage() {
+      return storage;
    }
 
    public DiscordWebhook webhook() {
