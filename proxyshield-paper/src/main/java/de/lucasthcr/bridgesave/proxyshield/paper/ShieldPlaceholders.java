@@ -18,8 +18,9 @@ import org.jetbrains.annotations.NotNull;
  * on the main thread, often several times a second inside a scoreboard, so a blocking HTTP request
  * behind one would freeze the server rather than fill in a number.
  * <p>
- * Registered only when PlaceholderAPI is actually installed, and the class is not touched otherwise,
- * so the plugin loads normally on a server without it.
+ * Nothing outside {@code PaperMain#hookPlaceholders} may name this class: loading it resolves
+ * {@link PlaceholderExpansion}, which does not exist without PlaceholderAPI installed. The caller
+ * checks for the plugin first and never reaches this class otherwise.
  */
 public final class ShieldPlaceholders extends PlaceholderExpansion {
 
@@ -32,26 +33,18 @@ public final class ShieldPlaceholders extends PlaceholderExpansion {
    }
 
    /**
-    * Registers the expansion if PlaceholderAPI is present.
+    * Registers the expansion. Only called once PlaceholderAPI is known to be installed.
     *
-    * @return the registered expansion, or {@code null} when PlaceholderAPI is not installed
+    * @return a callback that unregisters it again, or {@code null} if it would not register
     */
-   static ShieldPlaceholders registerIfPresent(JavaPlugin plugin, ProxyShieldCore core) {
-      if (plugin.getServer().getPluginManager().getPlugin("PlaceholderAPI") == null) {
+   static Runnable register(JavaPlugin plugin, ProxyShieldCore core) {
+      ShieldPlaceholders expansion = new ShieldPlaceholders(plugin, core);
+      if (!expansion.register()) {
+         plugin.getLogger().warning("PlaceholderAPI refused the ProxyShield expansion.");
          return null;
       }
-
-      try {
-         ShieldPlaceholders expansion = new ShieldPlaceholders(plugin, core);
-         if (expansion.register()) {
-            plugin.getLogger().info("Registered the PlaceholderAPI expansion (%proxyshield_...%).");
-            return expansion;
-         }
-      } catch (Throwable incompatible) {
-         plugin.getLogger().warning("Could not register the PlaceholderAPI expansion: "
-               + incompatible.getMessage());
-      }
-      return null;
+      plugin.getLogger().info("Registered the PlaceholderAPI expansion (%proxyshield_...%).");
+      return expansion::unregister;
    }
 
    @Override

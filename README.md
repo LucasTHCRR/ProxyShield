@@ -29,11 +29,11 @@ identically.
 
 | Build | File | Runs on |
 |---|---|---|
-| Paper | `ProxyShield-Paper-2.1.jar` | Paper, Purpur and Spigot 1.21+ |
-| Folia | `ProxyShield-Folia-2.1.jar` | Folia |
-| BungeeCord | `ProxyShield-Bungee-2.1.jar` | BungeeCord / Waterfall |
-| Velocity | `ProxyShield-Velocity-2.1.jar` | Velocity 3.3+ |
-| Sponge | `ProxyShield-Sponge-2.1.jar` | SpongeAPI 17 |
+| Paper | `ProxyShield-Paper-2.2.1.jar` | Paper, Purpur and Spigot 1.21+ |
+| Folia | `ProxyShield-Folia-2.2.1.jar` | Folia |
+| BungeeCord | `ProxyShield-Bungee-2.2.1.jar` | BungeeCord / Waterfall |
+| Velocity | `ProxyShield-Velocity-2.2.1.jar` | Velocity 3.3+ |
+| Sponge | `ProxyShield-Sponge-2.2.1.jar` | SpongeAPI 17 |
 
 The Paper and Folia jars are built from the same sources and are interchangeable. The scheduling
 already uses the regionised API, so either one runs on either server. They exist separately because

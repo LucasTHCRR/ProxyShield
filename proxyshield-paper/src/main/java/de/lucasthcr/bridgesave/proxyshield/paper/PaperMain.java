@@ -33,7 +33,15 @@ public final class PaperMain extends JavaPlugin implements Listener, CommandExec
    private ProxyShieldCore core;
    private CommandHandler commands;
    private ServerBridge bridge;
-   private ShieldPlaceholders placeholders;
+
+   /**
+    * Undoes the PlaceholderAPI registration, or {@code null} when there was none.
+    * <p>
+    * Held as a {@link Runnable} rather than as the expansion itself: naming that type in a field
+    * or a call outside the guard below is enough to make the JVM resolve it, and resolving it
+    * without PlaceholderAPI installed is exactly the crash this avoids.
+    */
+   private Runnable placeholderCleanup;
 
    @Override
    public void onEnable() {
@@ -45,7 +53,7 @@ public final class PaperMain extends JavaPlugin implements Listener, CommandExec
       commands = new CommandHandler(core);
 
       startMetrics();
-      placeholders = ShieldPlaceholders.registerIfPresent(this, core);
+      placeholderCleanup = hookPlaceholders();
 
       getServer().getPluginManager().registerEvents(this, this);
       var command = getCommand("proxyshield");
@@ -57,11 +65,34 @@ public final class PaperMain extends JavaPlugin implements Listener, CommandExec
 
    @Override
    public void onDisable() {
-      if (placeholders != null) {
-         placeholders.unregister();
+      if (placeholderCleanup != null) {
+         placeholderCleanup.run();
       }
       if (core != null) {
          core.shutdown();
+      }
+   }
+
+   /**
+    * Registers the placeholder expansion, but only where PlaceholderAPI actually is.
+    * <p>
+    * The check has to live here rather than inside the expansion class. Touching that class at all
+    * makes the JVM load it, loading it resolves its superclass {@code PlaceholderExpansion}, and on
+    * a server without PlaceholderAPI that throws {@link NoClassDefFoundError} before any code of
+    * ours runs — which took the whole plugin down with it in 2.2.
+    *
+    * @return a callback that unregisters the expansion, or {@code null} if none was registered
+    */
+   private Runnable hookPlaceholders() {
+      if (getServer().getPluginManager().getPlugin("PlaceholderAPI") == null) {
+         return null;
+      }
+      try {
+         return ShieldPlaceholders.register(this, core);
+      } catch (Throwable incompatible) {
+         // Also catches a PlaceholderAPI too old for this expansion API.
+         getLogger().warning("Could not register the PlaceholderAPI expansion: " + incompatible);
+         return null;
       }
    }
 

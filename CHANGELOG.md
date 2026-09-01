@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.2.1
+
+### Fixed
+
+- **The Bukkit builds refused to start without PlaceholderAPI installed.** The check for it lived
+  inside the expansion class itself, so reaching the check meant loading that class, and loading it
+  resolved its `PlaceholderExpansion` superclass — which does not exist on a server without
+  PlaceholderAPI. The result was a `NoClassDefFoundError` during `onEnable` that took the whole
+  plugin down, leaving the server with no proxy protection at all. The guard now sits in
+  `PaperMain`, before anything names the expansion class, and the registration is additionally
+  wrapped so an incompatible PlaceholderAPI version cannot stop the plugin either.
+
+  Only the Paper and Folia builds of 2.2 were affected. BungeeCord, Velocity and Sponge never
+  touched that code and are functionally unchanged in this release.
+
 ## 2.2
 
 The detection layer, rebuilt. v2.1 asked one provider and took the first answer it got; if that
