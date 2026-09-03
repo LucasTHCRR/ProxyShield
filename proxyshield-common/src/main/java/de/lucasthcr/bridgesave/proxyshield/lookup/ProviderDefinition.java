@@ -10,7 +10,7 @@ import java.util.Set;
  * <p>
  * v2.1 had a single generic parser that guessed at field names, which meant a provider nesting its
  * verdict under {@code security.vpn} or reporting a probability as the string {@code "0.99"} was
- * silently read as "clean" — a false negative, the one failure mode an anti-VPN must not have. A
+ * silently read as "clean" - a false negative, the one failure mode an anti-VPN must not have. A
  * definition removes the guessing: every supported service states its own paths, and an operator
  * can describe an unlisted one in config.yml without touching code.
  */

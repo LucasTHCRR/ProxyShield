@@ -55,6 +55,6 @@ public final class Text {
       if (input == null) {
          return "";
       }
-      return input.length() <= max ? input : input.substring(0, Math.max(0, max - 1)) + "…";
+      return input.length() <= max ? input : input.substring(0, Math.max(0, max - 3)) + "...";
    }
 }

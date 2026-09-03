@@ -181,17 +181,17 @@ public final class Messages {
       m.put("reload-kept", "&7The previous configuration is still active.");
 
       m.put("refresh-running", "{prefix}&eA list refresh is already running.");
-      m.put("refresh-start", "{prefix}&7Downloading VPN lists…");
+      m.put("refresh-start", "{prefix}&7Downloading VPN lists...");
       m.put("refresh-done", "{prefix}&aLists updated: &f{ranges} &aranges, &f{addresses} &aaddresses.");
       m.put("refresh-failed", "{prefix}&cRefresh failed: &f{error}");
 
-      m.put("recheck-start", "{prefix}&7Re-checking every online player…");
+      m.put("recheck-start", "{prefix}&7Re-checking every online player...");
       m.put("recheck-done", "{prefix}&aRecheck finished, &f{count} &aplayer(s) disconnected.");
       m.put("recheck-dry-run", "{prefix}&aRecheck finished. &6Dry-run is on, nobody was disconnected.");
 
       m.put("cache-cleared", "{prefix}&aDropped &f{count} &acached lookup result(s).");
 
-      m.put("check-start", "{prefix}&7Checking &f{ip}&7…");
+      m.put("check-start", "{prefix}&7Checking &f{ip}&7...");
       m.put("check-header", "&8&m--------&r &c&lProxyShield Check &8&m--------");
       m.put("check-target", "&7Target: &f{target} &8(&f{ip}&8)");
       m.put("check-verdict-allowed", "&7Verdict: &aALLOWED &8- &f{reason}");
@@ -206,7 +206,7 @@ public final class Messages {
       m.put("check-lists", "&7On list: {list} &8| &7Whitelisted: {whitelist} &8| &7Blacklisted: {blacklist}");
       m.put("check-dry-run-note", "&6Dry-run is on, so this player would still be let through.");
 
-      m.put("lookup-start", "{prefix}&7Querying the provider for &f{ip}&7…");
+      m.put("lookup-start", "{prefix}&7Querying the provider for &f{ip}&7...");
       m.put("lookup-failed", "{prefix}&cLookup failed: &f{error}");
       m.put("lookup-details", "&7ASN &f{asn} &8| &7type &f{type} &8| &7score &f{score} &8| &7flagged by &f{sources}");
       m.put("lookup-result", "&7{ip} &8→ &7country &f{country} &8| &7proxy {proxy} &8| &7hosting {hosting} &8| &7isp &f{isp}");

@@ -84,12 +84,12 @@ reload-kept: "&7Die vorherige Konfiguration bleibt aktiv."
 
 # --- /proxyshield refresh ---
 refresh-running: "{prefix}&eEine Aktualisierung laeuft bereits."
-refresh-start: "{prefix}&7VPN-Listen werden geladen…"
+refresh-start: "{prefix}&7VPN-Listen werden geladen..."
 refresh-done: "{prefix}&aListen aktualisiert: &f{ranges} &aBereiche, &f{addresses} &aAdressen."
 refresh-failed: "{prefix}&cAktualisierung fehlgeschlagen: &f{error}"
 
 # --- /proxyshield recheck ---
-recheck-start: "{prefix}&7Alle Online-Spieler werden neu geprueft…"
+recheck-start: "{prefix}&7Alle Online-Spieler werden neu geprueft..."
 recheck-done: "{prefix}&aPruefung fertig, &f{count} &aSpieler getrennt."
 recheck-dry-run: "{prefix}&aPruefung fertig. &6Testlauf ist aktiv, es wurde niemand getrennt."
 
@@ -97,7 +97,7 @@ recheck-dry-run: "{prefix}&aPruefung fertig. &6Testlauf ist aktiv, es wurde niem
 cache-cleared: "{prefix}&a&f{count} &azwischengespeicherte Abfrage(n) verworfen."
 
 # --- /proxyshield check ---
-check-start: "{prefix}&7Pruefe &f{ip}&7…"
+check-start: "{prefix}&7Pruefe &f{ip}&7..."
 check-header: "&8&m--------&r &c&lProxyShield Pruefung &8&m--------"
 check-target: "&7Ziel: &f{target} &8(&f{ip}&8)"
 check-verdict-allowed: "&7Ergebnis: &aERLAUBT &8- &f{reason}"
@@ -113,7 +113,7 @@ check-lists: "&7Auf Liste: {list} &8| &7Whitelist: {whitelist} &8| &7Blacklist: 
 check-dry-run-note: "&6Testlauf ist aktiv, dieser Spieler wuerde also trotzdem durchgelassen."
 
 # --- /proxyshield lookup ---
-lookup-start: "{prefix}&7Frage den Anbieter zu &f{ip} &7ab…"
+lookup-start: "{prefix}&7Frage den Anbieter zu &f{ip} &7ab..."
 lookup-failed: "{prefix}&cAbfrage fehlgeschlagen: &f{error}"
 lookup-details: "&7ASN &f{asn} &8| &7Typ &f{type} &8| &7Score &f{score} &8| &7gemeldet von &f{sources}"
 lookup-result: "&7{ip} &8→ &7Land &f{country} &8| &7Proxy {proxy} &8| &7Hosting {hosting} &8| &7Anbieter &f{isp}"

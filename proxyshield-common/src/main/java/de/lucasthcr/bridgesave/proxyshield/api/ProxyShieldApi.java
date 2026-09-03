@@ -38,7 +38,7 @@ public final class ProxyShieldApi {
    /**
     * Whether the address is currently believed to be a proxy, VPN or Tor exit.
     * <p>
-    * Answers from the cache only — it never performs a network request, so it is safe to call from
+    * Answers from the cache only - it never performs a network request, so it is safe to call from
     * the main thread. An address nobody has looked up yet is reported as {@code false}.
     */
    public static boolean isProxy(String ip) {

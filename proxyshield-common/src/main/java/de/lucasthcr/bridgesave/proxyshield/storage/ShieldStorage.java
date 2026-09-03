@@ -7,7 +7,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
- * Where verdicts and player history are kept between restarts, and — on a network — between
+ * Where verdicts and player history are kept between restarts, and - on a network - between
  * servers.
  * <p>
  * A network running several proxies used to look each address up once per proxy, multiplying the

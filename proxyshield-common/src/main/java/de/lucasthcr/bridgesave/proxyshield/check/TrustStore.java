@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * repeatedly over several days is almost certainly not the botnet, so it stops being re-judged on
  * every login.
  * <p>
- * Trust never overrides the manual blacklist — an operator's explicit decision outranks any
+ * Trust never overrides the manual blacklist - an operator's explicit decision outranks any
  * inference made here.
  */
 public final class TrustStore {

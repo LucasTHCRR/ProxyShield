@@ -20,8 +20,8 @@ import org.bukkit.entity.Player;
 /**
  * Bukkit implementation of {@link Platform}, covering Paper, Folia, Purpur and Spigot.
  * <p>
- * The three calls that differ between those servers — async scheduling, disconnecting a player and
- * sending a message — go through a {@link ServerBridge} chosen at startup.
+ * The three calls that differ between those servers - async scheduling, disconnecting a player and
+ * sending a message - go through a {@link ServerBridge} chosen at startup.
  */
 final class PaperPlatform implements Platform {
 

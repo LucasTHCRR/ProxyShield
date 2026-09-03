@@ -237,7 +237,7 @@ public final class Json {
    /**
     * Reads a value as a number, accepting the string spellings providers use.
     * <p>
-    * getipintel.net returns its probability as {@code "0.99"} — a JSON string, not a number — and
+    * getipintel.net returns its probability as {@code "0.99"} - a JSON string, not a number - and
     * reading that as a boolean silently yields {@code false}, letting the proxy straight through.
     */
    public static Double numberAt(Object root, String dottedPath) {

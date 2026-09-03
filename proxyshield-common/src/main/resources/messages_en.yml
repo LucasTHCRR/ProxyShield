@@ -84,12 +84,12 @@ reload-kept: "&7The previous configuration is still active."
 
 # --- /proxyshield refresh ---
 refresh-running: "{prefix}&eA list refresh is already running."
-refresh-start: "{prefix}&7Downloading VPN lists…"
+refresh-start: "{prefix}&7Downloading VPN lists..."
 refresh-done: "{prefix}&aLists updated: &f{ranges} &aranges, &f{addresses} &aaddresses."
 refresh-failed: "{prefix}&cRefresh failed: &f{error}"
 
 # --- /proxyshield recheck ---
-recheck-start: "{prefix}&7Re-checking every online player…"
+recheck-start: "{prefix}&7Re-checking every online player..."
 recheck-done: "{prefix}&aRecheck finished, &f{count} &aplayer(s) disconnected."
 recheck-dry-run: "{prefix}&aRecheck finished. &6Dry-run is on, nobody was disconnected."
 
@@ -97,7 +97,7 @@ recheck-dry-run: "{prefix}&aRecheck finished. &6Dry-run is on, nobody was discon
 cache-cleared: "{prefix}&aDropped &f{count} &acached lookup result(s)."
 
 # --- /proxyshield check ---
-check-start: "{prefix}&7Checking &f{ip}&7…"
+check-start: "{prefix}&7Checking &f{ip}&7..."
 check-header: "&8&m--------&r &c&lProxyShield Check &8&m--------"
 check-target: "&7Target: &f{target} &8(&f{ip}&8)"
 check-verdict-allowed: "&7Verdict: &aALLOWED &8- &f{reason}"
@@ -113,7 +113,7 @@ check-lists: "&7On list: {list} &8| &7Whitelisted: {whitelist} &8| &7Blacklisted
 check-dry-run-note: "&6Dry-run is on, so this player would still be let through."
 
 # --- /proxyshield lookup ---
-lookup-start: "{prefix}&7Querying the provider for &f{ip}&7…"
+lookup-start: "{prefix}&7Querying the provider for &f{ip}&7..."
 lookup-failed: "{prefix}&cLookup failed: &f{error}"
 lookup-details: "&7ASN &f{asn} &8| &7type &f{type} &8| &7score &f{score} &8| &7flagged by &f{sources}"
 lookup-result: "&7{ip} &8→ &7country &f{country} &8| &7proxy {proxy} &8| &7hosting {hosting} &8| &7isp &f{isp}"

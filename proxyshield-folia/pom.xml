@@ -15,7 +15,7 @@
     <description>
         Folia build. Folia is a Paper fork with the same API, so this module compiles the exact
         same sources as proxyshield-paper rather than duplicating them; only the plugin descriptor
-        and the jar name differ. The Paper build runs on Folia too — this exists so servers looking
+        and the jar name differ. The Paper build runs on Folia too - this exists so servers looking
         for a jar named after their platform find one.
     </description>
 

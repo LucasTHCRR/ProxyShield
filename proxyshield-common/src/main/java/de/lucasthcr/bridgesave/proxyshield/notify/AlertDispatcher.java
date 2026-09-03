@@ -144,7 +144,7 @@ public final class AlertDispatcher {
     * Rolls blocks.log over once it gets large.
     * <p>
     * A busy proxy writes a line per detection and nothing ever trimmed the file, so on a network
-    * under sustained bot pressure it grew without limit until the disk ran out — taking the server
+    * under sustained bot pressure it grew without limit until the disk ran out - taking the server
     * with it, which is a worse outcome than any VPN getting through.
     */
    public void rotateLogIfLarge() {

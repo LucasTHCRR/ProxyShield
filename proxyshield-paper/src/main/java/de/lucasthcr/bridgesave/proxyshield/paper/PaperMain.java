@@ -79,7 +79,7 @@ public final class PaperMain extends JavaPlugin implements Listener, CommandExec
     * The check has to live here rather than inside the expansion class. Touching that class at all
     * makes the JVM load it, loading it resolves its superclass {@code PlaceholderExpansion}, and on
     * a server without PlaceholderAPI that throws {@link NoClassDefFoundError} before any code of
-    * ours runs — which took the whole plugin down with it in 2.2.
+    * ours runs - which took the whole plugin down with it in 2.2.
     *
     * @return a callback that unregisters the expansion, or {@code null} if none was registered
     */

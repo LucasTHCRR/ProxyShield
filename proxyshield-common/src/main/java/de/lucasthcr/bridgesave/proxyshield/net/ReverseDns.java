@@ -15,8 +15,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Reverse DNS as a detection signal, with a hard timeout.
  * <p>
- * Hosting and VPN operators name their machines after themselves — {@code
- * mad-01.torguard.io}, {@code vpn-gw3.example.net}, {@code static.hosting.provider} — so the PTR
+ * Hosting and VPN operators name their machines after themselves - {@code
+ * mad-01.torguard.io}, {@code vpn-gw3.example.net}, {@code static.hosting.provider} - so the PTR
  * record catches ranges no feed has picked up yet and no API quota is spent on it. It is a hint,
  * not a verdict: it contributes weight to the consensus score rather than blocking on its own,
  * because plenty of legitimate ISPs put words like {@code host} in their customer PTRs.

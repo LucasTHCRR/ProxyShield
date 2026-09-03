@@ -123,7 +123,7 @@ whitelist:
   # Exempt Bedrock players who joined through Geyser/Floodgate.
   #
   # Keep this on unless you know you need it off. Whenever Geyser runs anywhere
-  # other than the player's own machine, the address seen here is Geyser's — and
+  # other than the player's own machine, the address seen here is Geyser's - and
   # a Geyser instance on rented hardware sits in exactly the datacenter ranges
   # the feeds list, so every Bedrock player would be dropped at once.
   # Floodgate derives these UUIDs server side from the Xbox Live account, so a
@@ -139,7 +139,7 @@ blacklist:
 #
 #  Regulars stop being re-judged on every login. An account that has connected
 #  cleanly often enough, over long enough, is exempt from the lists, the
-#  providers and the heuristics — but never from blacklist.ips.
+#  providers and the heuristics - but never from blacklist.ips.
 #
 #  This is the single most effective defence against false positives, which is
 #  what actually costs a server players. Mobile users on carrier NAT can land in

@@ -10,7 +10,7 @@ import org.bukkit.plugin.Plugin;
  * Spigot and CraftBukkit.
  * <p>
  * Falls back to {@code BukkitScheduler} and the string based chat API. Everything here has existed
- * for a decade, so it also works on Paper — it is simply not used there, because the modern
+ * for a decade, so it also works on Paper - it is simply not used there, because the modern
  * schedulers behave better and are the only ones Folia has.
  */
 final class LegacyBridge implements ServerBridge {

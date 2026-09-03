@@ -20,8 +20,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * Queries one IP intelligence endpoint described by a {@link ProviderDefinition}.
  * <p>
  * Caching and combination live in {@link FailoverLookupService}, which owns the set of these.
- * Everything provider-specific — where the flags sit in the response, whether the key goes in the
- * URL or a header, whether the body is JSON at all — comes from the definition, so adding a service
+ * Everything provider-specific - where the flags sit in the response, whether the key goes in the
+ * URL or a header, whether the body is JSON at all - comes from the definition, so adding a service
  * is a catalog entry rather than a parser branch.
  */
 public final class IpLookupService implements LookupProvider {

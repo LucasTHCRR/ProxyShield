@@ -53,12 +53,12 @@ address.
 
 **Detection**
 
-- 26 IP intelligence services built in, enabled by name — 15 of them need no API key at all
+- 26 IP intelligence services built in, enabled by name - 15 of them need no API key at all
 - Consensus scoring: several providers are asked at once and their weights added up, so one service
   that has never heard of a VPN cannot clear it, and one noisy service cannot kick anybody alone
 - Public VPN, datacenter and Tor exit feeds with correct CIDR matching, IPv4 and IPv6
 - Network (ASN) block and allow rules, which catch a VPN's new range before any feed lists it
-- Reverse DNS patterns as a signal — free, unlimited, and effective on ranges nobody has catalogued
+- Reverse DNS patterns as a signal - free, unlimited, and effective on ranges nobody has catalogued
 - Behavioural heuristics: join rate per subnet, accounts per address, an account changing country
 - Trust for regulars, so a tightened rule or a provider having a bad day does not kick your players
 - Country filtering, blacklist or whitelist mode
@@ -124,7 +124,7 @@ reached, the cache survives restarts and reloads, and a provider that starts fai
 the rotation until it recovers.
 
 A service the catalog does not know can be described directly in `config.yml` with a URL and dotted
-field paths — see the commented example at the bottom of the `providers` section.
+field paths - see the commented example at the bottom of the `providers` section.
 
 ### Country filtering
 
@@ -162,7 +162,7 @@ discord:
 
 ### Storage on a network
 
-One server needs no setup — verdicts and trust live in two files. A network of several proxies
+One server needs no setup - verdicts and trust live in two files. A network of several proxies
 should share them, so each address is looked up once for the whole network instead of once per
 proxy:
 
@@ -181,7 +181,7 @@ proxy takes effect on the others immediately, rather than when the entry expires
 ProxyShield bundles no database driver and no Redis library, so nothing is relocated into a server
 that did not ask for it. Most Bukkit servers already have a MySQL and a SQLite driver; if yours does
 not, drop the driver jar into the ProxyShield folder and name it under `storage.sql.driver-path`. If
-the store cannot be reached, the plugin says so once and falls back to file storage — a database
+the store cannot be reached, the plugin says so once and falls back to file storage - a database
 outage never becomes a login outage.
 
 ### PlaceholderAPI

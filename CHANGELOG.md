@@ -6,7 +6,7 @@
 
 - **The Bukkit builds refused to start without PlaceholderAPI installed.** The check for it lived
   inside the expansion class itself, so reaching the check meant loading that class, and loading it
-  resolved its `PlaceholderExpansion` superclass — which does not exist on a server without
+  resolved its `PlaceholderExpansion` superclass - which does not exist on a server without
   PlaceholderAPI. The result was a `NoClassDefFoundError` during `onEnable` that took the whole
   plugin down, leaving the server with no proxy protection at all. The guard now sits in
   `PaperMain`, before anything names the expansion class, and the registration is additionally
@@ -44,7 +44,7 @@ was consulted. That is the miss this release exists to close.
   on its own.
 - **Network (ASN) rules** (`detection.asn`). Address feeds always lag behind a VPN renting a new
   range; the network number does not, so blocking the ASN catches every address inside it at once.
-  ASNs are normalised across the four spellings providers use (`AS9009`, `9009`, `AS9009 M247 …`).
+  ASNs are normalised across the four spellings providers use (`AS9009`, `9009`, `AS9009 M247 ...`).
 - **Reverse DNS as a signal** (`detection.rdns`). Operators name their machines after themselves, so
   the PTR record catches ranges no feed lists yet, costs no quota and cannot be rate limited. It
   contributes weight rather than blocking outright, and runs under a hard timeout.
@@ -57,7 +57,7 @@ was consulted. That is the miss this release exists to close.
   which by definition appears on no list anywhere.
 - **Tor exit list** as a default feed, and a `detection.block-tor` switch.
 - **Custom providers in config.yml.** Any unlisted service can be described with a URL, dotted field
-  paths, an optional score field and a threshold — no code needed.
+  paths, an optional score field and a threshold - no code needed.
 - **On-disk lookup cache** (`api.persist-cache`), so a restart no longer spends its first minutes
   re-querying addresses the plugin already knew about.
 - `/proxyshield providers` lists every enabled service with its live health, and
@@ -67,8 +67,8 @@ was consulted. That is the miss this release exists to close.
   MariaDB, PostgreSQL, SQLite, H2 or Redis instead of a local file, so a network running several
   proxies pays for each address once rather than once per proxy, and every front end agrees about
   it. Redis additionally pushes invalidations, so whitelisting an address or clearing the cache on
-  one server takes effect on the others immediately. No driver and no Redis library is bundled —
-  the schema stays in portable SQL and the Redis protocol is spoken directly — so nothing is
+  one server takes effect on the others immediately. No driver and no Redis library is bundled -
+  the schema stays in portable SQL and the Redis protocol is spoken directly - so nothing is
   relocated into a server that did not ask for it. A store that cannot be reached falls back to
   file storage with one warning; a database outage never becomes a login outage.
 - **bStats metrics** (`metrics`), reporting configuration shape and counters, never addresses or
@@ -88,7 +88,7 @@ was consulted. That is the miss this release exists to close.
 - **Nested and numeric responses were silently read as clean.** A flag at `security.vpn`,
   `privacy.is_vpn` or `risk.is_proxy` was invisible to the flat reader, and getipintel's probability
   arrives as the JSON string `"0.99"`, which read as a boolean is `false`. Both produced a false
-  negative — a VPN let straight through with no error anywhere.
+  negative - a VPN let straight through with no error anywhere.
 - **iphub's `block: 2` counted as a detection.** It means "unclear", not "block", so it kicked
   players the provider had explicitly declined to judge.
 - **A response carrying none of a provider's documented fields now counts as a failure**, not as a
@@ -123,7 +123,7 @@ was consulted. That is the miss this release exists to close.
   scheduling, disconnecting a player and sending a message go through a bridge chosen at start-up,
   so the Paper-only types are never loaded on a server that lacks them.
 - **Bedrock players are exempt by default** (`whitelist.bedrock-players`). Wherever Geyser runs
-  anywhere other than the player's own machine, the address seen here is Geyser's — and a Geyser
+  anywhere other than the player's own machine, the address seen here is Geyser's - and a Geyser
   instance on rented hardware sits in exactly the datacenter ranges the feeds list, so without this
   a server would drop every Bedrock player the moment hosting detection was switched on. Floodgate
   derives these UUIDs server side from the Xbox Live account, so a Java player cannot fake one.
@@ -166,7 +166,7 @@ raw.githubusercontent.com and the plugin started with no list protection at all.
 ### Added
 
 - **Spigot support.** The Bukkit jar now runs on Paper, Purpur, Folia and plain Spigot. The three
-  calls that differ — async scheduling, disconnecting a player and sending a message — go through a
+  calls that differ - async scheduling, disconnecting a player and sending a message - go through a
   bridge chosen at start-up, so the Paper-only types are never loaded on a server that lacks them.
 - **Sponge and Folia support.** Five builds now: Paper, Folia, BungeeCord, Velocity, Sponge. Paper
   scheduling moved to the modern `AsyncScheduler` and entity schedulers, which is what lets the code

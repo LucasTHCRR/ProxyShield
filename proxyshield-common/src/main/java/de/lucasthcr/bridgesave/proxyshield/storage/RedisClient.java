@@ -14,8 +14,8 @@ import java.util.function.BiConsumer;
 /**
  * A minimal Redis client speaking RESP over a plain socket.
  * <p>
- * ProxyShield needs six commands — {@code AUTH}, {@code SELECT}, {@code GET}, {@code SET},
- * {@code DEL} and pub/sub — and has to work identically on five server platforms, three of which
+ * ProxyShield needs six commands - {@code AUTH}, {@code SELECT}, {@code GET}, {@code SET},
+ * {@code DEL} and pub/sub - and has to work identically on five server platforms, three of which
  * ship no shading-safe classpath of their own. Bundling a full client library means relocating it
  * and its transitive dependencies into every jar, where it can still collide with another plugin's
  * copy. RESP is a line protocol simple enough that speaking it directly is the smaller risk, the

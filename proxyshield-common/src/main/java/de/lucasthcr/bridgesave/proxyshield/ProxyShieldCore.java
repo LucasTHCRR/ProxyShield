@@ -182,7 +182,7 @@ public final class ProxyShieldCore {
       config = updated;
       messages = Messages.load(platform, updated.language());
 
-      // Rebuilt because providers, weights and cache sizing all come from config — but the
+      // Rebuilt because providers, weights and cache sizing all come from config - but the
       // cached answers carry over, so a reload no longer costs a fresh round of provider quota.
       FailoverLookupService previousLookups = lookups;
       lookups = new FailoverLookupService(platform, updated, previousLookups, storage);

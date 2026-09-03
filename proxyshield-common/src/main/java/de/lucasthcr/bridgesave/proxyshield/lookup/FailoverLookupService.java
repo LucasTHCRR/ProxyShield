@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>
  * Two modes. {@code failover} asks providers in order and takes the first answer, which is cheap
  * but means a service that has never heard of a particular commercial VPN clears the address before
- * anything better gets asked — the single biggest source of misses in v2.1. {@code consensus} asks
+ * anything better gets asked - the single biggest source of misses in v2.1. {@code consensus} asks
  * several at once and blocks when the combined weight of the services flagging the address reaches
  * the configured score, so one blind provider can no longer wave a connection through.
  * <p>
@@ -256,7 +256,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
    /**
     * Asks every provider at once and adds up the weight of those that flagged the address.
     * <p>
-    * Returns as soon as the threshold is reached — the remaining requests are cancelled, so the
+    * Returns as soon as the threshold is reached - the remaining requests are cancelled, so the
     * common case of an obvious VPN costs the latency of the fastest provider that recognises it,
     * not of the slowest one in the list.
     */
@@ -495,7 +495,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       }
       if (providers.size() == 1 && mode == ShieldConfig.LookupMode.CONSENSUS) {
          platform.warn("Consensus mode is on but only one provider is enabled, so there is nothing"
-               + " to cross-check against. Enable a few more under api.providers — the free ones"
+               + " to cross-check against. Enable a few more under api.providers - the free ones"
                + " need no key.");
       }
    }
