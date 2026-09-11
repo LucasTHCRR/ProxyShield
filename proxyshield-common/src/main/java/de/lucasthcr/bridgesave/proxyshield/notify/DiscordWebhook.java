@@ -115,7 +115,7 @@ public final class DiscordWebhook {
             connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("POST");
             connection.setRequestProperty("Content-Type", "application/json");
-            connection.setRequestProperty("User-Agent", "ProxyShield/2.1");
+            connection.setRequestProperty("User-Agent", "ProxyShield/" + platform.version());
             connection.setConnectTimeout(5000);
             connection.setReadTimeout(5000);
             connection.setDoOutput(true);
@@ -187,33 +187,46 @@ public final class DiscordWebhook {
       }
    }
 
-   private String buildBody(ShieldConfig current, Payload payload) {
+   String buildBody(ShieldConfig current, Payload payload) {
       String displayIp = current.discordShowIp() ? payload.ip : "hidden";
-      String title = Text.stripColors(current.discordTitle());
 
       Json.Writer json = new Json.Writer();
-      json.beginObject()
-            .field("username", Text.stripColors(current.discordUsername()))
-            .name("embeds").beginArray()
-            .beginObject()
-            .field("title", payload.enforced ? title : title + " (dry run)")
-            .field("color", current.discordColor())
+      json.beginObject();
+
+      // Discord rejects the whole request with HTTP 400 when a string it does expect to be filled
+      // arrives empty, so an option left blank has to be left out rather than sent as "". Omitting
+      // the name falls back to whatever the webhook itself is called, which is what a blank value
+      // was meant to express in the first place.
+      String username = Text.stripColors(current.discordUsername());
+      if (!username.isBlank()) {
+         json.field("username", Text.clip(username, 80));
+      }
+
+      json.name("embeds").beginArray().beginObject();
+
+      String title = embedTitle(current, payload);
+      if (!title.isBlank()) {
+         json.field("title", Text.clip(title, 256));
+      }
+
+      json.field("color", current.discordColor())
             .field("timestamp", Instant.now().toString())
             .name("fields").beginArray()
             .beginObject()
-            .field("name", "Player").field("value", payload.player).field("inline", true)
+            .field("name", "Player").field("value", present(payload.player)).field("inline", true)
             .endObject()
             .beginObject()
-            .field("name", "IP").field("value", displayIp).field("inline", true)
+            .field("name", "IP").field("value", present(displayIp)).field("inline", true)
             .endObject()
             .beginObject()
-            .field("name", "Country").field("value", payload.country).field("inline", true)
+            .field("name", "Country").field("value", present(payload.country)).field("inline", true)
             .endObject()
             .beginObject()
-            .field("name", "Reason").field("value", payload.reason).field("inline", true)
+            .field("name", "Reason").field("value", present(payload.reason)).field("inline", true)
             .endObject()
             .beginObject()
-            .field("name", "ISP").field("value", Text.clip(payload.isp, 200)).field("inline", true)
+            .field("name", "ISP").field("value", Text.clip(present(payload.isp), 200))
+            .field("inline", true)
             .endObject()
             .beginObject()
             .field("name", "Action")
@@ -230,6 +243,25 @@ public final class DiscordWebhook {
       return json.toString();
    }
 
+   /** The embed heading, which stays empty when the operator cleared {@code discord.title}. */
+   private static String embedTitle(ShieldConfig current, Payload payload) {
+      String title = Text.stripColors(current.discordTitle()).trim();
+      if (payload.enforced) {
+         return title;
+      }
+      return title.isEmpty() ? "Dry run" : title + " (dry run)";
+   }
+
+   /**
+    * A value Discord will accept in an embed field.
+    * <p>
+    * An empty field value is refused the same way an empty title is, and these carry provider data,
+    * so one service answering with a blank ISP would otherwise drop every alert.
+    */
+   private static String present(String value) {
+      return value == null || value.isBlank() ? "unknown" : value;
+   }
+
    public long sentCount() {
       return sent.get();
    }
@@ -242,7 +274,7 @@ public final class DiscordWebhook {
       return queue.size();
    }
 
-   private record Payload(String player, String ip, String reason, String country, String isp,
+   record Payload(String player, String ip, String reason, String country, String isp,
          boolean enforced) {
    }
 }
