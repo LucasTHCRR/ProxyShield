@@ -146,6 +146,16 @@ class CommandActionsTest {
    }
 
    @Test
+   @DisplayName("{action_id} means the same here as in the Discord layout")
+   void actionIdMatchesTheEmbedSpelling() {
+      CommandActions actions = actions(Map.of("actions.on-flag",
+            List.of("log {action} {action_id}")));
+
+      actions.onFlag("Notch", PLAYER_ID, "1.2.3.4", proxyVerdict(), true);
+      assertEquals("log kicked kicked", dispatched().get(0).command());
+   }
+
+   @Test
    @DisplayName("An unknown placeholder is left for whatever plugin owns it")
    void leavesUnknownPlaceholders() {
       actions(Map.of("actions.on-flag", List.of("other {not_ours} {player}")))

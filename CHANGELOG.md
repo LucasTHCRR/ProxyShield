@@ -41,6 +41,11 @@
 
   The thumbnail must be `https://`, the same rule the webhook URL is held to.
 
+- **`{action_id}` in `actions.on-flag`**, matching the embed layout. `{action}` is the short
+  `kicked` / `allowed` for a command but the readable `Connection denied` in the embed, which is
+  a trap if you write both. `{action_id}` is the short form in either place. `{action}` keeps the
+  meaning it shipped with in each, so nothing changes under an existing config.
+
 ## 2.3.0
 
 ### Added

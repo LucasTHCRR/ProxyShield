@@ -548,8 +548,13 @@ notifications:
 #    {reason_id} machine readable form of the same, e.g. "proxy", "tor"
 #    {country}   country code     {isp}      network operator
 #    {asn}       network number   {score}    combined provider score
-#    {sources}   which services flagged it   {action}  "kicked" or "allowed"
+#    {sources}   which services flagged it
 #    {platform}  the server software
+#    {action} and {action_id}     both "kicked" or "allowed"
+#
+#  Careful: the Discord layout further down also has an {action}, but there it
+#  is the readable sentence ("Connection denied"). {action_id} is the short
+#  form in both places.
 # ============================================================================
 actions:
   # Run with a leading slash or without, both work. Runs as the console, so the
@@ -603,7 +608,8 @@ discord:
   #    {player}  {uuid}     {ip}      {reason}   {country}  {isp}
   #    {asn}     {score}    {sources} {platform} {version}
   #    {action}     - "Connection denied" or "Logged only (dry run)"
-  #    {action_id}  - "kicked" or "allowed"
+  #    {action_id}  - "kicked" or "allowed", the same short form the
+  #                   actions.on-flag commands above use
   #
   #  Values go in exactly as written, so you decide the formatting. Discord
   #  reads embed text as Markdown and an underscore is a legal Minecraft name

@@ -102,6 +102,9 @@ public final class CommandActions {
             Map.entry("score", String.format(Locale.ROOT, "%.2f", verdict.lookup().confidence())),
             Map.entry("sources", verdict.lookup().sourceSummary()),
             Map.entry("action", enforced ? "kicked" : "allowed"),
+            // Same spelling the embed layout uses, so one name means one thing in both places.
+            // {action} stays as it shipped in 2.3.0 rather than changing under anyone.
+            Map.entry("action_id", enforced ? "kicked" : "allowed"),
             Map.entry("platform", platform.name()));
    }
 
