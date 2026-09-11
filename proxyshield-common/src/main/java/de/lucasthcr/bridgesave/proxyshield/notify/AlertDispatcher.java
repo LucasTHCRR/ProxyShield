@@ -32,14 +32,18 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * Fans a block out to every enabled notification channel.
+ * Fans a block out to every enabled notification channel, then runs the configured commands.
  * <p>
  * Silent mode suppresses the two channels players and admins see live, the staff broadcast and the
  * console line, while the log file and the Discord webhook keep recording. That way a server can
  * watch for false positives without advertising to everyone online that the filter fired.
+ * <p>
+ * The commands are deliberately not part of silent mode: they are an action the operator asked for,
+ * not something anybody reads.
  */
 public final class AlertDispatcher {
 
@@ -54,6 +58,7 @@ public final class AlertDispatcher {
 
    private final Platform platform;
    private final DiscordWebhook webhook;
+   private final CommandActions commands;
    private final Path logFile;
    private final ReentrantLock logLock = new ReentrantLock();
 
@@ -62,11 +67,12 @@ public final class AlertDispatcher {
    private volatile boolean logFileBroken;
 
    public AlertDispatcher(Platform platform, ShieldConfig config, Messages messages,
-         DiscordWebhook webhook) {
+         DiscordWebhook webhook, CommandActions commands) {
       this.platform = platform;
       this.config = config;
       this.messages = messages;
       this.webhook = webhook;
+      this.commands = commands;
       this.logFile = platform.dataFolder().resolve("blocks.log");
    }
 
@@ -74,6 +80,7 @@ public final class AlertDispatcher {
       this.config = config;
       this.messages = messages;
       this.logFileBroken = false;
+      commands.applyConfig(config);
    }
 
    /**
@@ -81,7 +88,7 @@ public final class AlertDispatcher {
     *
     * @param enforced {@code false} when dry-run mode kept the player connected
     */
-   public void alert(String player, String ip, CheckVerdict verdict, boolean enforced) {
+   public void alert(String player, UUID uuid, String ip, CheckVerdict verdict, boolean enforced) {
       ShieldConfig current = config;
       String message = messages.get(enforced ? "alert" : "alert-dry-run",
             placeholders(player, ip, verdict, enforced));
@@ -98,6 +105,7 @@ public final class AlertDispatcher {
       }
 
       webhook.enqueue(player, ip, verdict, enforced);
+      commands.onFlag(player, uuid, ip, verdict, enforced);
    }
 
    private Map<String, String> placeholders(String player, String ip, CheckVerdict verdict,

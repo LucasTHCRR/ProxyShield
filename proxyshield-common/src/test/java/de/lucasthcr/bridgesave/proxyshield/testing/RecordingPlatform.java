@@ -44,6 +44,7 @@ public final class RecordingPlatform implements Platform {
    private final List<String> warnings = new ArrayList<>();
    private final List<String> errors = new ArrayList<>();
    private final List<String> console = new ArrayList<>();
+   private final List<DispatchedCommand> commands = new ArrayList<>();
    private final List<ShieldPlayer> players = new ArrayList<>();
 
    public RecordingPlatform(Path dataFolder) {
@@ -68,6 +69,11 @@ public final class RecordingPlatform implements Platform {
 
    public List<String> consoleMessages() {
       return console;
+   }
+
+   /** Every command dispatched so far, in order. */
+   public List<DispatchedCommand> dispatchedCommands() {
+      return commands;
    }
 
    @Override
@@ -150,6 +156,15 @@ public final class RecordingPlatform implements Platform {
    @Override
    public void sendConsole(String legacyMessage) {
       console.add(legacyMessage);
+   }
+
+   @Override
+   public void dispatchCommand(String command, long delaySeconds) {
+      commands.add(new DispatchedCommand(command, delaySeconds));
+   }
+
+   /** One command the core asked the platform to run, with the delay it asked for. */
+   public record DispatchedCommand(String command, long delaySeconds) {
    }
 
    @Override

@@ -178,6 +178,19 @@ final class BungeePlatform implements Platform {
    }
 
    @Override
+   public void dispatchCommand(String command, long delaySeconds) {
+      ProxyServer proxy = ProxyServer.getInstance();
+      // BungeeCord has no main thread to get back onto, so an immediate dispatch runs right here.
+      Runnable dispatch = () -> proxy.getPluginManager().dispatchCommand(proxy.getConsole(),
+            command);
+      if (delaySeconds <= 0L) {
+         dispatch.run();
+      } else {
+         proxy.getScheduler().schedule(plugin, dispatch, delaySeconds, TimeUnit.SECONDS);
+      }
+   }
+
+   @Override
    public Collection<ShieldPlayer> onlinePlayers() {
       List<ShieldPlayer> players = new ArrayList<>();
       for (ProxiedPlayer player : ProxyServer.getInstance().getPlayers()) {

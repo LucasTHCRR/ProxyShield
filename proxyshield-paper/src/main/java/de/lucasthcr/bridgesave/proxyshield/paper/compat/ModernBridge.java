@@ -36,6 +36,9 @@ import org.bukkit.plugin.Plugin;
  */
 final class ModernBridge implements ServerBridge {
 
+   /** The global region scheduler counts in ticks, twenty to the second. */
+   private static final long TICKS_PER_SECOND = 20L;
+
    private static Component color(String legacyMessage) {
       return LegacyComponentSerializer.legacyAmpersand().deserialize(legacyMessage);
    }
@@ -79,5 +82,21 @@ final class ModernBridge implements ServerBridge {
    public void kick(Plugin plugin, Player player, String legacyMessage) {
       // On Folia the player belongs to a region thread, so the kick has to be scheduled there.
       player.getScheduler().run(plugin, scheduled -> player.kick(color(legacyMessage)), null);
+   }
+
+   @Override
+   public void dispatchCommand(Plugin plugin, String command, long delaySeconds) {
+      // Console commands are not tied to a region, so they belong on the global scheduler. That is
+      // the one Folia requires here, and Paper accepts it too, which keeps this to a single path.
+      if (delaySeconds <= 0L) {
+         Bukkit.getGlobalRegionScheduler().run(plugin, scheduled -> run(command));
+      } else {
+         Bukkit.getGlobalRegionScheduler().runDelayed(plugin, scheduled -> run(command),
+               delaySeconds * TICKS_PER_SECOND);
+      }
+   }
+
+   private static void run(String command) {
+      Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
    }
 }

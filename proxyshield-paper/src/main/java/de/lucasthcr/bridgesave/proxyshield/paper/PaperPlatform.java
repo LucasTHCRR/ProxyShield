@@ -176,6 +176,15 @@ final class PaperPlatform implements Platform {
    }
 
    @Override
+   public void dispatchCommand(String command, long delaySeconds) {
+      // A disabled plugin cannot schedule, and the scheduler would throw rather than ignore it.
+      if (!plugin.isEnabled()) {
+         return;
+      }
+      bridge.dispatchCommand(plugin, command, delaySeconds);
+   }
+
+   @Override
    public Collection<ShieldPlayer> onlinePlayers() {
       List<ShieldPlayer> players = new ArrayList<>();
       for (Player player : Bukkit.getOnlinePlayers()) {

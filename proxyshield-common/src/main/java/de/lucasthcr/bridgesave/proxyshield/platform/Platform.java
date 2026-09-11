@@ -83,6 +83,18 @@ public interface Platform {
    /** Sends an already colourised message to the console. */
    void sendConsole(String legacyMessage);
 
+   /**
+    * Runs a command as the server console, optionally after a delay.
+    * <p>
+    * Checks run on a login thread, so the adapter has to move the dispatch onto whichever thread
+    * its server requires: the main thread on Spigot, the global region thread on Folia. The delay
+    * exists because a detection is decided before the player is on the server: anything that needs
+    * them connected has to wait for the join to finish.
+    *
+    * @param delaySeconds seconds to wait, or {@code 0} to dispatch as soon as the thread allows
+    */
+   void dispatchCommand(String command, long delaySeconds);
+
    Collection<ShieldPlayer> onlinePlayers();
 
    Optional<ShieldPlayer> player(UUID uuid);

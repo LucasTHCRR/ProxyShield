@@ -73,4 +73,16 @@ final class LegacyBridge implements ServerBridge {
       // Disconnecting is a main-thread operation on a non-regionised server.
       Bukkit.getScheduler().runTask(plugin, () -> player.kickPlayer(color(legacyMessage)));
    }
+
+   @Override
+   public void dispatchCommand(Plugin plugin, String command, long delaySeconds) {
+      // Command dispatch touches the whole server, so it has to be on the main thread. Checks run
+      // on a login thread, which is why this is scheduled rather than called straight through.
+      Runnable dispatch = () -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+      if (delaySeconds <= 0L) {
+         Bukkit.getScheduler().runTask(plugin, dispatch);
+      } else {
+         Bukkit.getScheduler().runTaskLater(plugin, dispatch, delaySeconds * TICKS_PER_SECOND);
+      }
+   }
 }

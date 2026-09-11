@@ -29,11 +29,11 @@ identically.
 
 | Build | File | Runs on |
 |---|---|---|
-| Paper | `ProxyShield-Paper-2.2.1.jar` | Paper, Purpur and Spigot 1.21+ |
-| Folia | `ProxyShield-Folia-2.2.1.jar` | Folia |
-| BungeeCord | `ProxyShield-Bungee-2.2.1.jar` | BungeeCord / Waterfall |
-| Velocity | `ProxyShield-Velocity-2.2.1.jar` | Velocity 3.3+ |
-| Sponge | `ProxyShield-Sponge-2.2.1.jar` | SpongeAPI 17 |
+| Paper | `ProxyShield-Paper-2.3.0.jar` | Paper, Purpur and Spigot 1.21+ |
+| Folia | `ProxyShield-Folia-2.3.0.jar` | Folia |
+| BungeeCord | `ProxyShield-Bungee-2.3.0.jar` | BungeeCord / Waterfall |
+| Velocity | `ProxyShield-Velocity-2.3.0.jar` | Velocity 3.3+ |
+| Sponge | `ProxyShield-Sponge-2.3.0.jar` | SpongeAPI 17 |
 
 The Paper and Folia jars are built from the same sources and are interchangeable. The scheduling
 already uses the regionised API, so either one runs on either server. They exist separately because
@@ -76,6 +76,7 @@ address.
 **Operations**
 
 - Dry-run mode: detect and report without disconnecting anybody
+- Console commands on a detection, so a flagged player can be marked or restricted instead of kicked
 - `/proxyshield check` shows what every single provider said, so a false positive can be traced
 - Lookup cache survives restarts and reloads; simultaneous logins from one address share one query
 - Shared storage for a network: MySQL, MariaDB, PostgreSQL, SQLite, H2 or Redis
@@ -148,6 +149,39 @@ notifications:
 
 Suppresses the staff broadcast and the console line. The log file and the webhook still record every
 detection, so you keep the data without announcing to everyone online that the filter fired.
+
+### Commands on a detection
+
+Not every server wants a flagged player gone. To mark them instead, run whatever you would have run
+by hand:
+
+```yaml
+detection:
+  dry-run: true
+
+actions:
+  on-flag:
+    - "lp user {player} permission set myserver.vpnflagged true"
+    - "webhook {player} flagged {reason} from {ip}"
+  delay-seconds: 3
+  run-when: always
+```
+
+With `dry-run` on, the detection still fires, the alert and the webhook still go out and these
+commands still run, but the player stays connected. That is the flag-instead-of-kick setup: put them
+in a restricted group, make them verify through Discord, hand the name to another plugin.
+
+Commands run as the console, with or without a leading slash. Available placeholders are
+`{player}`, `{uuid}`, `{ip}`, `{reason}`, `{reason_id}`, `{country}`, `{isp}`, `{asn}`, `{score}`,
+`{sources}`, `{action}` and `{platform}`.
+
+`delay-seconds` matters more than it looks. A connection is judged before the player is on the
+server, so at `0` the commands run while they are still connecting. That is fine for a permission
+grant or a webhook, but anything that needs them actually online, such as messaging them or
+prompting them to link an account, needs a few seconds here.
+
+`run-when` accepts `always`, `kicked` or `allowed` when the commands should only fire for players
+who were disconnected, or only for those who were not.
 
 ### Discord webhook
 

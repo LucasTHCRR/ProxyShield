@@ -147,6 +147,20 @@ final class VelocityPlatform implements Platform {
    }
 
    @Override
+   public void dispatchCommand(String command, long delaySeconds) {
+      // Velocity runs commands on its own executor, so there is no thread to hop back to.
+      Runnable dispatch = () -> server.getCommandManager()
+            .executeAsync(server.getConsoleCommandSource(), command);
+      if (delaySeconds <= 0L) {
+         dispatch.run();
+      } else {
+         server.getScheduler().buildTask(plugin, dispatch)
+               .delay(delaySeconds, TimeUnit.SECONDS)
+               .schedule();
+      }
+   }
+
+   @Override
    public Collection<ShieldPlayer> onlinePlayers() {
       List<ShieldPlayer> players = new ArrayList<>();
       for (Player player : server.getAllPlayers()) {

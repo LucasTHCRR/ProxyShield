@@ -1,5 +1,5 @@
 # ============================================================================
-#  ProxyShield v2.2.1  -  Anti-VPN / Anti-Proxy
+#  ProxyShield v2.3.0  -  Anti-VPN / Anti-Proxy
 #  Paper - Folia - BungeeCord - Velocity - Sponge
 #
 #  Every option below behaves identically on all five platforms.
@@ -528,6 +528,52 @@ notifications:
   # The file is rolled over automatically once it reaches 16 MB.
   log-file: true
 
+# ============================================================================
+#  Actions
+#
+#  Console commands ProxyShield runs when a connection is flagged.
+#
+#  This is the hook for everything the plugin deliberately does not do itself.
+#  If you would rather mark a flagged player than drop them - put them in a
+#  restricted group, make them verify through Discord, hand the name to another
+#  plugin - write that as a command here.
+#
+#  To flag without kicking, set detection.dry-run to true above. The detection
+#  still fires, the alert and the webhook still go out, these commands still
+#  run, and the player stays connected.
+#
+#  Placeholders:
+#    {player}    name             {uuid}     the account's UUID
+#    {ip}        address          {reason}   why it was flagged, e.g. "proxy/VPN"
+#    {reason_id} machine readable form of the same, e.g. "proxy", "tor"
+#    {country}   country code     {isp}      network operator
+#    {asn}       network number   {score}    combined provider score
+#    {sources}   which services flagged it   {action}  "kicked" or "allowed"
+#    {platform}  the server software
+# ============================================================================
+actions:
+  # Run with a leading slash or without, both work. Runs as the console, so the
+  # command must be one the console is allowed to use.
+  on-flag: []
+  # on-flag:
+  #   - "lp user {player} permission set myserver.vpnflagged true"
+  #   - "webhook {player} flagged {reason} from {ip}"
+
+  # Seconds to wait before running them.
+  #
+  # A connection is judged before the player is on the server, so at 0 the
+  # commands run while they are still connecting. Anything that needs them
+  # actually online - a message, a teleport, a permission their session has
+  # already loaded - needs a few seconds here. Commands that work offline, like
+  # a LuckPerms permission or a webhook, can stay at 0. Capped at 300.
+  delay-seconds: 0
+
+  # Which detections to run them for.
+  #   always  - every detection (default)
+  #   kicked  - only when the player was actually disconnected
+  #   allowed - only when the player stayed connected, i.e. under dry-run
+  run-when: always
+
 discord:
   enabled: false
 
@@ -537,6 +583,9 @@ discord:
   # Set to false to print "hidden" instead of the address.
   show-ip: true
 
+  # Leave either empty to leave it out of the message: no username posts under
+  # whatever the webhook itself is named, no title gives an embed without a
+  # heading. They are omitted rather than sent empty, which Discord refuses.
   username: "ProxyShield"
   title: "ProxyShield Alert"
 

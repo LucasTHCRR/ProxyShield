@@ -1,5 +1,54 @@
 # Changelog
 
+## 2.3.0
+
+### Added
+
+- **Console commands on a detection** (`actions.on-flag`). Not every server wants a flagged player
+  gone. Some would rather mark them: drop them into a restricted group, make them verify through
+  Discord, hand the name to another plugin. That was previously impossible without waiting for each
+  case to become its own setting, so it is now a list of commands instead:
+
+  ```yaml
+  actions:
+    on-flag:
+      - "lp user {player} permission set myserver.vpnflagged true"
+      - "webhook {player} flagged {reason} from {ip}"
+    delay-seconds: 3
+    run-when: always
+  ```
+
+  Commands run as the console, with or without a leading slash. Placeholders are `{player}`,
+  `{uuid}`, `{ip}`, `{reason}`, `{reason_id}`, `{country}`, `{isp}`, `{asn}`, `{score}`,
+  `{sources}`, `{action}` and `{platform}`.
+
+  Combined with `detection.dry-run: true` this gives a flag-instead-of-kick setup: the detection
+  fires, the alert and the webhook go out, the commands run, and the player stays connected.
+
+  `delay-seconds` exists because a connection is judged before the player is on the server. At `0`
+  the commands run while they are still connecting, which is fine for a permission grant or a
+  webhook but not for anything that needs them actually online. `run-when` takes `always`, `kicked`
+  or `allowed` when the commands should only fire for one of the two outcomes.
+
+  Values coming from a provider, such as `{isp}`, are stripped of characters a dispatcher would
+  read as a separator, so a hostile network name cannot turn one configured command into two.
+
+### Fixed
+
+- **Clearing `discord.username` or `discord.title` broke the webhook entirely**, with every alert
+  rejected as `HTTP 400`. Discord refuses the whole request when a string it expects to be filled
+  arrives empty, and the plugin only ever saw the status code, so the cause looked like a bad
+  webhook URL. Both options are now left out of the payload when blank rather than sent as `""`:
+  an empty username falls back to whatever the webhook itself is named, which is what clearing it
+  was meant to do. Embed field values are guarded the same way, so a provider answering with a
+  blank ISP no longer costs the alert.
+- **Providers that answer with a redirect were treated as failures.** The lookup now follows up to
+  three hops, which is enough for an http-to-https move or a relocated path.
+- **A keyed service left enabled without a key was asked with an empty key** rather than without
+  one. `?key=` is not the same as omitting the parameter: iplocate.io reads the empty value as a
+  wrong key and answers `401`, so a service that works perfectly well unauthenticated looked broken.
+  The parameter is now dropped entirely when no key is configured.
+
 ## 2.2.1
 
 ### Fixed

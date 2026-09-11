@@ -62,4 +62,11 @@ public interface ServerBridge {
 
    /** Disconnects the player on whichever thread owns them. */
    void kick(Plugin plugin, Player player, String legacyMessage);
+
+   /**
+    * Runs a console command on the thread this server dispatches commands from.
+    *
+    * @param delaySeconds seconds to wait first, or {@code 0} to run at the next opportunity
+    */
+   void dispatchCommand(Plugin plugin, String command, long delaySeconds);
 }

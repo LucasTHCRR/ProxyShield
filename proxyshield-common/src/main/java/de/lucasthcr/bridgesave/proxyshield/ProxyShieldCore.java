@@ -31,6 +31,7 @@ import de.lucasthcr.bridgesave.proxyshield.lookup.FailoverLookupService;
 import de.lucasthcr.bridgesave.proxyshield.net.ManagedIpList;
 import de.lucasthcr.bridgesave.proxyshield.net.ReverseDns;
 import de.lucasthcr.bridgesave.proxyshield.notify.AlertDispatcher;
+import de.lucasthcr.bridgesave.proxyshield.notify.CommandActions;
 import de.lucasthcr.bridgesave.proxyshield.notify.DiscordWebhook;
 import de.lucasthcr.bridgesave.proxyshield.platform.Platform;
 import de.lucasthcr.bridgesave.proxyshield.platform.ShieldPlayer;
@@ -39,6 +40,7 @@ import de.lucasthcr.bridgesave.proxyshield.storage.ShieldStorage;
 import de.lucasthcr.bridgesave.proxyshield.storage.StorageFactory;
 import java.io.IOException;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -69,6 +71,7 @@ public final class ProxyShieldCore {
    private volatile FailoverLookupService lookups;
    private volatile CheckEngine engine;
    private volatile DiscordWebhook webhook;
+   private volatile CommandActions commands;
    private volatile AlertDispatcher alerts;
    private volatile ReverseDns reverseDns;
    private volatile ShieldStorage storage;
@@ -93,7 +96,8 @@ public final class ProxyShieldCore {
       lookups = new FailoverLookupService(platform, config, null, storage);
       reverseDns = newReverseDns(config);
       webhook = new DiscordWebhook(platform, config);
-      alerts = new AlertDispatcher(platform, config, messages, webhook);
+      commands = new CommandActions(platform, config);
+      alerts = new AlertDispatcher(platform, config, messages, webhook, commands);
 
       if (config.apiPersistCache()) {
          lookups.preloadFrom(storage);
@@ -114,6 +118,11 @@ public final class ProxyShieldCore {
       lookups.warnIfInsecure();
       if (config.dryRun()) {
          platform.warn("Dry-run mode is enabled: detections are reported but nobody is kicked.");
+      }
+      if (!config.flagCommands().isEmpty()) {
+         platform.info("Flag actions: " + config.flagCommands().size() + " console command(s), "
+               + "run-when=" + config.flagCommandTrigger().name().toLowerCase(Locale.ROOT)
+               + ", delay=" + config.flagCommandDelaySeconds() + "s.");
       }
 
       running = true;
@@ -255,7 +264,7 @@ public final class ProxyShieldCore {
          statistics.record(verdict, enforced);
 
          if (verdict.blocked()) {
-            alerts.alert(player.name(), ip, verdict, enforced);
+            alerts.alert(player.name(), player.uuid(), ip, verdict, enforced);
             if (enforced) {
                player.kick(kickMessage(verdict, player.name(), ip));
                disconnected++;
@@ -323,7 +332,7 @@ public final class ProxyShieldCore {
       statistics.record(verdict, enforced);
 
       if (verdict.blocked()) {
-         alerts.alert(playerName, ip, verdict, enforced);
+         alerts.alert(playerName, uuid, ip, verdict, enforced);
          // An account caught behind a proxy starts earning its exemption again from scratch.
          trust.forget(uuid);
       } else if (current.trustEnabled()
@@ -400,6 +409,10 @@ public final class ProxyShieldCore {
 
    public AlertDispatcher alerts() {
       return alerts;
+   }
+
+   public CommandActions commands() {
+      return commands;
    }
 
    /** Result of a connection check, already reduced to what the platform has to act on. */

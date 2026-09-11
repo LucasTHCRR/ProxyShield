@@ -36,6 +36,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.apache.logging.log4j.Logger;
 import org.spongepowered.api.Game;
+import org.spongepowered.api.command.exception.CommandException;
 import org.spongepowered.api.entity.living.player.server.ServerPlayer;
 import org.spongepowered.api.scheduler.ScheduledTask;
 import org.spongepowered.api.scheduler.Task;
@@ -150,6 +151,25 @@ final class SpongePlatform implements Platform {
    @Override
    public void sendConsole(String legacyMessage) {
       game.systemSubject().sendMessage(color(legacyMessage));
+   }
+
+   @Override
+   public void dispatchCommand(String command, long delaySeconds) {
+      // Sponge wants commands on the server thread, so this goes to the sync scheduler rather than
+      // the async one the rest of the plugin uses.
+      Task.Builder task = Task.builder().execute(() -> process(command)).plugin(container);
+      if (delaySeconds > 0L) {
+         task.delay(Duration.ofSeconds(delaySeconds));
+      }
+      game.server().scheduler().submit(task.build());
+   }
+
+   private void process(String command) {
+      try {
+         game.server().commandManager().process(game.systemSubject(), command);
+      } catch (CommandException failure) {
+         warn("Flag command '/" + command + "' failed: " + failure.getMessage());
+      }
    }
 
    @Override

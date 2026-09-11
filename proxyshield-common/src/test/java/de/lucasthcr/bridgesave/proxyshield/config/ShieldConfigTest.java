@@ -136,6 +136,37 @@ class ShieldConfigTest {
    }
 
    @Test
+   @DisplayName("Flag actions ship switched off, so an update runs nothing unasked")
+   void flagActionsAreEmptyByDefault() {
+      assertTrue(shipped.flagCommands().isEmpty());
+      assertEquals(0L, shipped.flagCommandDelaySeconds());
+      assertEquals(ShieldConfig.ActionTrigger.ALWAYS, shipped.flagCommandTrigger());
+   }
+
+   @Test
+   @DisplayName("run-when accepts the documented words and falls back to always")
+   void actionTriggerParsing() {
+      assertEquals(ShieldConfig.ActionTrigger.KICKED, trigger("kicked"));
+      assertEquals(ShieldConfig.ActionTrigger.ALLOWED, trigger("ALLOWED"));
+      assertEquals(ShieldConfig.ActionTrigger.ALWAYS, trigger("always"));
+      assertEquals(ShieldConfig.ActionTrigger.ALWAYS, trigger("nonsense"));
+   }
+
+   private static ShieldConfig.ActionTrigger trigger(String raw) {
+      return ShieldConfig.from(new MapConfigNode(Map.of("actions.run-when", raw)))
+            .flagCommandTrigger();
+   }
+
+   @Test
+   @DisplayName("Commands are cleaned of the slash operators habitually write")
+   void flagCommandsAreNormalised() {
+      ShieldConfig config = ShieldConfig.from(new MapConfigNode(Map.of(
+            "actions.on-flag", List.of("  /lp user {player} info  ", "", "   ", "/  webhook x"))));
+
+      assertEquals(List.of("lp user {player} info", "webhook x"), config.flagCommands());
+   }
+
+   @Test
    void discordIsOffAndNotUsableWithoutAUrl() {
       assertFalse(shipped.discordEnabled());
       assertFalse(shipped.discordUsable());

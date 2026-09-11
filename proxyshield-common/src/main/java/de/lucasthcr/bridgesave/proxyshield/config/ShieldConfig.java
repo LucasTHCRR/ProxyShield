@@ -40,6 +40,28 @@ public final class ShieldConfig {
       }
    }
 
+   /** Which detections the {@code actions.on-flag} commands run for. */
+   public enum ActionTrigger {
+      /** Every detection, whether or not the player was disconnected. */
+      ALWAYS,
+      /** Only detections that actually disconnected the player. */
+      KICKED,
+      /** Only detections the player survived, i.e. dry-run. */
+      ALLOWED;
+
+      static ActionTrigger parse(String raw) {
+         if ("kicked".equalsIgnoreCase(raw)) {
+            return KICKED;
+         }
+         return "allowed".equalsIgnoreCase(raw) ? ALLOWED : ALWAYS;
+      }
+
+      /** @param enforced whether the detection disconnected the player */
+      public boolean matches(boolean enforced) {
+         return this == ALWAYS || (enforced ? this == KICKED : this == ALLOWED);
+      }
+   }
+
    /** How the answers of several providers are combined. */
    public enum LookupMode {
       /**
@@ -158,6 +180,11 @@ public final class ShieldConfig {
    private final String notifyPermission;
    private final boolean logToFile;
 
+   // actions
+   private final List<String> flagCommands;
+   private final long flagCommandDelaySeconds;
+   private final ActionTrigger flagCommandTrigger;
+
    // discord
    private final boolean discordEnabled;
    private final String webhookUrl;
@@ -259,6 +286,13 @@ public final class ShieldConfig {
       this.consoleAlerts = node.getBoolean("notifications.console", true);
       this.notifyPermission = node.getString("notifications.permission", "proxyshield.notify");
       this.logToFile = node.getBoolean("notifications.log-file", true);
+
+      this.flagCommands = cleanCommands(node.getStringList("actions.on-flag"));
+      // Capped: the delay holds a task per detection, and a value in the hours would let a burst
+      // of joins pile up an unbounded queue of them.
+      this.flagCommandDelaySeconds =
+            Math.max(0L, Math.min(300L, node.getInt("actions.delay-seconds", 0)));
+      this.flagCommandTrigger = ActionTrigger.parse(node.getString("actions.run-when", "always"));
 
       this.discordEnabled = node.getBoolean("discord.enabled", false);
       this.webhookUrl = node.getString("discord.webhook-url", "");
@@ -402,6 +436,29 @@ public final class ShieldConfig {
 
    private static int clamp(int value, int min, int max) {
       return Math.max(min, Math.min(max, value));
+   }
+
+   /**
+    * Tidies the configured commands into something a dispatcher will accept.
+    * <p>
+    * A leading slash is dropped because every platform wants the bare command, and writing it with
+    * one is the natural mistake to make.
+    */
+   private static List<String> cleanCommands(List<String> values) {
+      List<String> out = new ArrayList<>(values.size());
+      for (String value : values) {
+         if (value == null || value.isBlank()) {
+            continue;
+         }
+         String command = value.trim();
+         while (command.startsWith("/")) {
+            command = command.substring(1).trim();
+         }
+         if (!command.isEmpty()) {
+            out.add(command);
+         }
+      }
+      return List.copyOf(out);
    }
 
    private static Set<String> upperCaseSet(List<String> values) {
@@ -743,6 +800,20 @@ public final class ShieldConfig {
    /** bStats id, or 0 to use the built-in one for this platform. */
    public int metricsPluginId() {
       return metricsPluginId;
+   }
+
+   /** Console commands to run on a detection, already stripped of any leading slash. */
+   public List<String> flagCommands() {
+      return flagCommands;
+   }
+
+   /** How long to wait before running them, so a join can finish first. Clamped to 300. */
+   public long flagCommandDelaySeconds() {
+      return flagCommandDelaySeconds;
+   }
+
+   public ActionTrigger flagCommandTrigger() {
+      return flagCommandTrigger;
    }
 
    public boolean silent() {
