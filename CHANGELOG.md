@@ -42,6 +42,11 @@
   an empty username falls back to whatever the webhook itself is named, which is what clearing it
   was meant to do. Embed field values are guarded the same way, so a provider answering with a
   blank ISP no longer costs the alert.
+- **Underscores in a player name were eaten by Discord's Markdown.** `Some_Name` arrived italic and
+  `__Name__` underlined with the underscores gone, which is the spelling staff then searched for and
+  could not find. The name, the address and the ISP are now sent as code spans, so they show exactly
+  as written and stay selectable. Escaping with backslashes would have rendered correctly but put
+  the backslashes into the copied text, which is worse.
 - **Providers that answer with a redirect were treated as failures.** The lookup now follows up to
   three hops, which is enough for an http-to-https move or a relocated path.
 - **A keyed service left enabled without a key was asked with an empty key** rather than without

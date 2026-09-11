@@ -114,7 +114,28 @@ class DiscordWebhookTest {
    void hiddenIpStaysPresent() {
       String json = body(Map.of("discord.show-ip", false), true);
 
-      assertTrue(json.contains("\"value\":\"hidden\""), json);
+      assertTrue(json.contains("\"value\":\"`hidden`\""), json);
       assertFalse(json.contains("1.2.3.4"), json);
+   }
+
+   @Test
+   @DisplayName("Underscores in a name survive Discord's Markdown")
+   void underscoresInNamesAreNotEaten() {
+      ShieldConfig config = ShieldConfig.from(new MapConfigNode(Map.of()));
+      String json = new DiscordWebhook(platform, config).buildBody(config,
+            new DiscordWebhook.Payload("__Maki_Alt__", "1.2.3.4", "VPN list", "DE", "M247", true));
+
+      assertTrue(json.contains("\"value\":\"`__Maki_Alt__`\""),
+            "the name has to reach Discord as written, not underlined: " + json);
+   }
+
+   @Test
+   @DisplayName("A backtick from a provider cannot break out of the code span")
+   void backticksInProviderTextAreDropped() {
+      ShieldConfig config = ShieldConfig.from(new MapConfigNode(Map.of()));
+      String json = new DiscordWebhook(platform, config).buildBody(config,
+            new DiscordWebhook.Payload("Notch", "1.2.3.4", "VPN list", "DE", "ev`il", true));
+
+      assertTrue(json.contains("\"value\":\"`evil`\""), json);
    }
 }

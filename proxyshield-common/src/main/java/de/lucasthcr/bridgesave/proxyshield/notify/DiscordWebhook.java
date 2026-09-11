@@ -213,10 +213,10 @@ public final class DiscordWebhook {
             .field("timestamp", Instant.now().toString())
             .name("fields").beginArray()
             .beginObject()
-            .field("name", "Player").field("value", present(payload.player)).field("inline", true)
+            .field("name", "Player").field("value", code(payload.player)).field("inline", true)
             .endObject()
             .beginObject()
-            .field("name", "IP").field("value", present(displayIp)).field("inline", true)
+            .field("name", "IP").field("value", code(displayIp)).field("inline", true)
             .endObject()
             .beginObject()
             .field("name", "Country").field("value", present(payload.country)).field("inline", true)
@@ -225,7 +225,7 @@ public final class DiscordWebhook {
             .field("name", "Reason").field("value", present(payload.reason)).field("inline", true)
             .endObject()
             .beginObject()
-            .field("name", "ISP").field("value", Text.clip(present(payload.isp), 200))
+            .field("name", "ISP").field("value", code(Text.clip(present(payload.isp), 200)))
             .field("inline", true)
             .endObject()
             .beginObject()
@@ -260,6 +260,23 @@ public final class DiscordWebhook {
     */
    private static String present(String value) {
       return value == null || value.isBlank() ? "unknown" : value;
+   }
+
+   /**
+    * Wraps a value in a code span so Discord shows it exactly as it is.
+    * <p>
+    * Embed values are parsed as Markdown, and an underscore is a legal Minecraft name character:
+    * {@code Some_Name} came out italic and {@code __Name__} underlined with the underscores eaten,
+    * which is the version staff then searched for and did not find. Escaping each character with a
+    * backslash renders correctly but puts the backslashes into the text that gets copied, so a code
+    * span is the one option that leaves the value both intact and selectable.
+    * <p>
+    * Backticks in the value would end the span early. Minecraft names cannot contain one, but ISP
+    * strings come from a provider and can contain anything, so they are dropped.
+    */
+   private static String code(String value) {
+      String text = present(value).replace("`", "");
+      return text.isBlank() ? "unknown" : "`" + text + "`";
    }
 
    public long sentCount() {
