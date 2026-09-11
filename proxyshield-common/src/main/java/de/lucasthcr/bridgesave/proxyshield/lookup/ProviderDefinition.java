@@ -132,12 +132,46 @@ public final class ProviderDefinition {
    public String url(String ip) {
       String resolved = urlTemplate.replace("{ip}", ip);
       if (keyStyle == KeyStyle.URL) {
-         resolved = resolved.replace("{key}", key == null ? "" : key);
+         resolved = key == null || key.isBlank()
+               ? dropKeyParameter(resolved)
+               : resolved.replace("{key}", key);
       }
       if (contact != null) {
          resolved = resolved.replace("{contact}", contact);
       }
       return resolved;
+   }
+
+   /**
+    * Removes the query parameter holding {@code {key}} when there is no key.
+    * <p>
+    * Leaving it behind as {@code ?apikey=} is not the same as omitting it: iplocate.io reads the
+    * empty value as a wrong key and answers {@code 401}, so a service that is perfectly usable
+    * without credentials looked broken. Anywhere the placeholder is not a query parameter, a key
+    * inside the path for instance, it is simply dropped.
+    */
+   private static String dropKeyParameter(String url) {
+      int placeholder = url.indexOf("{key}");
+      if (placeholder < 0) {
+         return url;
+      }
+
+      int query = url.indexOf('?');
+      if (query < 0 || placeholder < query) {
+         return url.replace("{key}", "");
+      }
+
+      // Walk back to the separator that starts this parameter, and forward to the next one.
+      int start = placeholder;
+      while (start > query && url.charAt(start - 1) != '&' && url.charAt(start - 1) != '?') {
+         start--;
+      }
+      int end = url.indexOf('&', placeholder);
+      if (end < 0) {
+         // Last parameter: take the separator in front of it with us.
+         return start - 1 == query ? url.substring(0, query) : url.substring(0, start - 1);
+      }
+      return url.substring(0, start) + url.substring(end + 1);
    }
 
    /** A copy of this definition carrying the operator's credentials. */

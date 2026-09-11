@@ -52,6 +52,9 @@ public final class IpLookupService implements LookupProvider {
    /** How long a tripped endpoint stays skipped. */
    private static final long BREAKER_COOLDOWN_MILLIS = 120_000L;
 
+   /** Redirects to follow before giving up, enough for a http-to-https hop and a path move. */
+   private static final int MAX_REDIRECTS = 3;
+
    private final Platform platform;
    private final ProviderDefinition definition;
    private final int timeoutMillis;
@@ -127,9 +130,21 @@ public final class IpLookupService implements LookupProvider {
    }
 
    private LookupResult query(String ip) {
+      return query(definition.url(ip), ip, 0);
+   }
+
+   /**
+    * Performs one request, following a redirect by hand where the JDK will not.
+    * <p>
+    * {@code HttpURLConnection} follows 301 and 302 on its own but ignores 307 and 308 entirely, and
+    * it never follows a redirect that changes protocol. A service that moved to HTTPS, or answers
+    * {@code 308 Permanent Redirect}, therefore looked like a hard failure and got its provider
+    * dropped into the circuit breaker for no reason.
+    */
+   private LookupResult query(String endpoint, String ip, int hop) {
       HttpURLConnection connection = null;
       try {
-         URL url = URI.create(definition.url(ip)).toURL();
+         URL url = URI.create(endpoint).toURL();
          connection = (HttpURLConnection) url.openConnection();
          connection.setConnectTimeout(timeoutMillis);
          connection.setReadTimeout(timeoutMillis);
@@ -141,6 +156,16 @@ public final class IpLookupService implements LookupProvider {
          }
 
          int status = connection.getResponseCode();
+         if (status >= 300 && status < 400) {
+            String location = connection.getHeaderField("Location");
+            if (location == null || location.isBlank()) {
+               return LookupResult.failed("HTTP " + status + " without a Location header");
+            }
+            if (hop >= MAX_REDIRECTS) {
+               return LookupResult.failed("too many redirects");
+            }
+            return query(URI.create(endpoint).resolve(location).toString(), ip, hop + 1);
+         }
          if (status == 429) {
             return LookupResult.failed("provider rate limited us (HTTP 429)");
          }

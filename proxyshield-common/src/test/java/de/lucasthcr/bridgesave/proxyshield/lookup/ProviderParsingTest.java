@@ -194,6 +194,28 @@ class ProviderParsingTest {
          assertTrue(vpnapi.withCredentials("abc123", null).usable());
       }
 
+      /**
+       * An empty key must not be sent as an empty parameter: iplocate.io reads {@code ?apikey=}
+       * as a wrong key and answers 401, which made a keyless-usable service look broken.
+       */
+      @Test
+      void anUnsetKeyDropsItsQueryParameterEntirely() {
+         assertEquals("https://iplocate.io/api/lookup/" + IP,
+               ProviderCatalog.byId("iplocate").url(IP));
+         assertEquals("https://api.ipapi.is/?q=" + IP,
+               ProviderCatalog.byId("ipapi-is").url(IP));
+         assertEquals("https://api.zowi.gay/" + IP,
+               ProviderCatalog.byId("zowi").url(IP));
+         assertEquals("https://proxycheck.io/v2/" + IP + "?vpn=1&asn=1&risk=1",
+               ProviderCatalog.byId("proxycheck").url(IP));
+      }
+
+      @Test
+      void aConfiguredKeyIsStillSubstituted() {
+         assertTrue(ProviderCatalog.byId("iplocate").withCredentials("abc123", null).url(IP)
+               .endsWith("?apikey=abc123"));
+      }
+
       @Test
       void headerKeysAreNotWrittenIntoTheUrl() {
          ProviderDefinition iphub = ProviderCatalog.byId("iphub").withCredentials("secret", null);
