@@ -31,7 +31,11 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Queue;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -67,7 +71,8 @@ public final class DiscordWebhook {
    }
 
    /** Queues an alert. Returns immediately; delivery happens on an async worker. */
-   public void enqueue(String player, String ip, CheckVerdict verdict, boolean enforced) {
+   public void enqueue(String player, UUID uuid, String ip, CheckVerdict verdict,
+         boolean enforced) {
       ShieldConfig current = config;
       if (!current.discordUsable()) {
          return;
@@ -78,8 +83,10 @@ public final class DiscordWebhook {
          return;
       }
 
-      queue.add(new Payload(player, ip, verdict.describe(),
-            verdict.lookup().countryOrUnknown(), verdict.lookup().ispOrUnknown(), enforced));
+      queue.add(new Payload(player, uuid, ip, verdict.describe(),
+            verdict.lookup().countryOrUnknown(), verdict.lookup().ispOrUnknown(),
+            verdict.lookup().asnOrUnknown(), verdict.lookup().confidence(),
+            verdict.lookup().sourceSummary(), enforced));
       drain();
    }
 
@@ -188,7 +195,8 @@ public final class DiscordWebhook {
    }
 
    String buildBody(ShieldConfig current, Payload payload) {
-      String displayIp = current.discordShowIp() ? payload.ip : "hidden";
+      EmbedTemplate template = current.discordEmbed();
+      Map<String, String> values = placeholders(current, payload);
 
       Json.Writer json = new Json.Writer();
       json.beginObject();
@@ -204,79 +212,112 @@ public final class DiscordWebhook {
 
       json.name("embeds").beginArray().beginObject();
 
-      String title = embedTitle(current, payload);
+      String title = titleFor(template, values, payload);
       if (!title.isBlank()) {
          json.field("title", Text.clip(title, 256));
       }
 
+      String description = fill(template.description(), values);
+      if (!description.isBlank()) {
+         json.field("description", Text.clip(description, 4096));
+      }
+
       json.field("color", current.discordColor())
-            .field("timestamp", Instant.now().toString())
-            .name("fields").beginArray()
-            .beginObject()
-            .field("name", "Player").field("value", code(payload.player)).field("inline", true)
-            .endObject()
-            .beginObject()
-            .field("name", "IP").field("value", code(displayIp)).field("inline", true)
-            .endObject()
-            .beginObject()
-            .field("name", "Country").field("value", present(payload.country)).field("inline", true)
-            .endObject()
-            .beginObject()
-            .field("name", "Reason").field("value", present(payload.reason)).field("inline", true)
-            .endObject()
-            .beginObject()
-            .field("name", "ISP").field("value", code(Text.clip(present(payload.isp), 200)))
-            .field("inline", true)
-            .endObject()
-            .beginObject()
-            .field("name", "Action")
-            .field("value", payload.enforced ? "Connection denied" : "Logged only (dry run)")
-            .field("inline", true)
-            .endObject()
-            .endArray()
-            .name("footer").beginObject()
-            .field("text", "ProxyShield " + platform.version() + " on " + platform.name())
-            .endObject()
-            .endObject()
-            .endArray()
-            .endObject();
+            .field("timestamp", Instant.now().toString());
+
+      // Only https, the same rule the webhook URL itself is held to: a http image would be
+      // requested by Discord over plain text from every viewer's client.
+      String thumbnail = fill(template.thumbnail(), values).trim();
+      if (thumbnail.startsWith("https://")) {
+         json.name("thumbnail").beginObject().field("url", thumbnail).endObject();
+      }
+
+      if (!template.fields().isEmpty()) {
+         json.name("fields").beginArray();
+         for (EmbedTemplate.Field field : template.fields()) {
+            String value = fill(field.value(), values);
+            if (value.isBlank()) {
+               // An empty field value is refused the same way an empty title is, and dropping the
+               // box is friendlier than losing the whole alert to a 400.
+               continue;
+            }
+            json.beginObject()
+                  .field("name", Text.clip(field.name(), 256))
+                  .field("value", Text.clip(value, 1024))
+                  .field("inline", field.inline())
+                  .endObject();
+         }
+         json.endArray();
+      }
+
+      String footer = fill(template.footer(), values);
+      if (!footer.isBlank()) {
+         json.name("footer").beginObject().field("text", Text.clip(footer, 2048)).endObject();
+      }
+
+      json.endObject().endArray().endObject();
       return json.toString();
    }
 
-   /** The embed heading, which stays empty when the operator cleared {@code discord.title}. */
-   private static String embedTitle(ShieldConfig current, Payload payload) {
-      String title = Text.stripColors(current.discordTitle()).trim();
+   /**
+    * The heading, with the dry-run marker appended unless the layout already says something about
+    * it. A blank title stays blank, which leaves the embed without a heading rather than sending
+    * the empty string Discord refuses.
+    */
+   private static String titleFor(EmbedTemplate template, Map<String, String> values,
+         Payload payload) {
+      String title = Text.stripColors(fill(template.title(), values)).trim();
       if (payload.enforced) {
+         return title;
+      }
+      if (title.toLowerCase(Locale.ROOT).contains("dry run")) {
          return title;
       }
       return title.isEmpty() ? "Dry run" : title + " (dry run)";
    }
 
-   /**
-    * A value Discord will accept in an embed field.
-    * <p>
-    * An empty field value is refused the same way an empty title is, and these carry provider data,
-    * so one service answering with a blank ISP would otherwise drop every alert.
-    */
-   private static String present(String value) {
-      return value == null || value.isBlank() ? "unknown" : value;
+   private Map<String, String> placeholders(ShieldConfig current, Payload payload) {
+      Map<String, String> values = new LinkedHashMap<>();
+      values.put("player", present(payload.player));
+      values.put("uuid", payload.uuid == null ? "unknown" : payload.uuid.toString());
+      values.put("ip", current.discordShowIp() ? present(payload.ip) : "hidden");
+      values.put("reason", present(payload.reason));
+      values.put("country", present(payload.country));
+      values.put("isp", Text.clip(present(payload.isp), 200));
+      values.put("asn", present(payload.asn));
+      values.put("score", String.format(Locale.ROOT, "%.2f", payload.score));
+      values.put("sources", present(payload.sources));
+      values.put("action", payload.enforced ? "Connection denied" : "Logged only (dry run)");
+      values.put("action_id", payload.enforced ? "kicked" : "allowed");
+      values.put("platform", platform.name());
+      values.put("version", platform.version());
+      return values;
    }
 
    /**
-    * Wraps a value in a code span so Discord shows it exactly as it is.
+    * Substitutes {@code {key}} placeholders into one template string.
     * <p>
-    * Embed values are parsed as Markdown, and an underscore is a legal Minecraft name character:
-    * {@code Some_Name} came out italic and {@code __Name__} underlined with the underscores eaten,
-    * which is the version staff then searched for and did not find. Escaping each character with a
-    * backslash renders correctly but puts the backslashes into the text that gets copied, so a code
-    * span is the one option that leaves the value both intact and selectable.
-    * <p>
-    * Backticks in the value would end the span early. Minecraft names cannot contain one, but ISP
-    * strings come from a provider and can contain anything, so they are dropped.
+    * Values go in exactly as written, because whether a name belongs in a code span is a layout
+    * decision and the operator owns the layout. Backticks coming from a provider are dropped so a
+    * hostile ISP string cannot close a code span the template opened.
     */
-   private static String code(String value) {
-      String text = present(value).replace("`", "");
-      return text.isBlank() ? "unknown" : "`" + text + "`";
+   private static String fill(String template, Map<String, String> values) {
+      if (template == null || template.isEmpty()) {
+         return "";
+      }
+      String result = template;
+      for (Map.Entry<String, String> entry : values.entrySet()) {
+         String token = "{" + entry.getKey() + "}";
+         if (result.contains(token)) {
+            result = result.replace(token, entry.getValue().replace("`", ""));
+         }
+      }
+      return result;
+   }
+
+   /** A value Discord will accept, since an empty one is refused the same way an empty title is. */
+   private static String present(String value) {
+      return value == null || value.isBlank() ? "unknown" : value;
    }
 
    public long sentCount() {
@@ -291,7 +332,7 @@ public final class DiscordWebhook {
       return queue.size();
    }
 
-   record Payload(String player, String ip, String reason, String country, String isp,
-         boolean enforced) {
+   record Payload(String player, UUID uuid, String ip, String reason, String country, String isp,
+         String asn, double score, String sources, boolean enforced) {
    }
 }

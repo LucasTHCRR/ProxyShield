@@ -1,5 +1,5 @@
 # ============================================================================
-#  ProxyShield v2.3.0  -  Anti-VPN / Anti-Proxy
+#  ProxyShield v2.4.0  -  Anti-VPN / Anti-Proxy
 #  Paper - Folia - BungeeCord - Velocity - Sponge
 #
 #  Every option below behaves identically on all five platforms.
@@ -591,6 +591,75 @@ discord:
 
   # Embed colour as a decimal number. 16711680 = red, 16753920 = orange.
   color: 16711680
+
+  # --------------------------------------------------------------------------
+  #  Message layout
+  #
+  #  Every visible part of the embed, written out. Delete this whole "embed"
+  #  section and you get the layout ProxyShield sent before 2.4, so an existing
+  #  config keeps looking exactly as it did.
+  #
+  #  Placeholders:
+  #    {player}  {uuid}     {ip}      {reason}   {country}  {isp}
+  #    {asn}     {score}    {sources} {platform} {version}
+  #    {action}     - "Connection denied" or "Logged only (dry run)"
+  #    {action_id}  - "kicked" or "allowed"
+  #
+  #  Values go in exactly as written, so you decide the formatting. Discord
+  #  reads embed text as Markdown and an underscore is a legal Minecraft name
+  #  character, so wrap anything that might contain one in backticks: without
+  #  them, Some_Name shows up italic and __Name__ underlined with the
+  #  underscores gone.
+  # --------------------------------------------------------------------------
+  embed:
+    # Leave empty to use "title" above. On a dry run "(dry run)" is appended
+    # unless the text already mentions it.
+    title: "ProxyShield Alert"
+
+    # Free text above the fields. Use "|" for more than one line.
+    description: ""
+
+    # Small image in the top right. Must be https.
+    thumbnail: ""
+
+    footer: "ProxyShield {version} on {platform}"
+
+    # One entry per box, in this order. The key is the heading.
+    # "inline: true" is what puts three of them on a row.
+    # Clear the whole list with "fields: {}" to send only the description.
+    fields:
+      Player:
+        value: "`{player}`"
+        inline: true
+      IP:
+        value: "`{ip}`"
+        inline: true
+      Country:
+        value: "{country}"
+        inline: true
+      Reason:
+        value: "{reason}"
+        inline: true
+      ISP:
+        value: "`{isp}`"
+        inline: true
+      Action:
+        value: "{action}"
+        inline: true
+
+  # A single block instead of the six boxes looks like this:
+  #
+  # embed:
+  #   title: "`{player}`"
+  #   description: |
+  #     ```ansi
+  #     IP: `{ip}`
+  #     Country: {country}
+  #     Action: {action}
+  #     ```
+  #   thumbnail: "https://your-server.example/alert.gif"
+  #   footer: "ProxyShield {version} on {platform}"
+  #   fields: {}
 
 # ============================================================================
 #  Permissions

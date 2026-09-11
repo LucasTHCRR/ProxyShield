@@ -1,5 +1,46 @@
 # Changelog
 
+## 2.4.0
+
+### Added
+
+- **The Discord embed layout is now yours to write** (`discord.embed`). The message used to be
+  fixed at a title and six inline boxes, and the one thing an operator could not change from
+  outside was what it looked like. Every visible part is a template string instead:
+
+  ```yaml
+  discord:
+    embed:
+      title: "`{player}`"
+      description: |
+        ```ansi
+        IP: `{ip}`
+        Country: {country}
+        Action: {action}
+        ```
+      thumbnail: "https://your-server.example/alert.gif"
+      footer: "ProxyShield {version} on {platform}"
+      fields: {}
+  ```
+
+  Placeholders are `{player}`, `{uuid}`, `{ip}`, `{reason}`, `{country}`, `{isp}`, `{asn}`,
+  `{score}`, `{sources}`, `{platform}`, `{version}`, `{action}` (`Connection denied` or
+  `Logged only (dry run)`) and `{action_id}` (`kicked` or `allowed`).
+
+  Fields are named entries rather than a list, the same way `api.providers` works, and appear in
+  the order written. Clear them with `fields: {}` for a description-only message, or drop the
+  whole `embed` section to keep the previous layout.
+
+  Values are substituted exactly as written, so the backticks are yours to place. That matters
+  because Discord parses embed text as Markdown and an underscore is a legal name character: the
+  shipped layout wraps everything that can contain one.
+
+  **Nothing changes for an existing server.** A config without an `embed` section renders the old
+  layout, and the section now shipped in `config.yml` is that same layout spelled out, which a
+  test pins.
+
+  The thumbnail must be `https://`, the same rule the webhook URL is held to.
+
 ## 2.3.0
 
 ### Added

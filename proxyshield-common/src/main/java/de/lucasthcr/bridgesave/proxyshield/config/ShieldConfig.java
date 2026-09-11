@@ -19,6 +19,7 @@
 package de.lucasthcr.bridgesave.proxyshield.config;
 
 import de.lucasthcr.bridgesave.proxyshield.lookup.ProviderCatalog;
+import de.lucasthcr.bridgesave.proxyshield.notify.EmbedTemplate;
 import de.lucasthcr.bridgesave.proxyshield.lookup.ProviderDefinition;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -192,6 +193,7 @@ public final class ShieldConfig {
    private final String discordUsername;
    private final String discordTitle;
    private final int discordColor;
+   private final EmbedTemplate discordEmbed;
 
    private ShieldConfig(ConfigNode node) {
       this.language = node.getString("settings.language", "en");
@@ -300,6 +302,7 @@ public final class ShieldConfig {
       this.discordUsername = node.getString("discord.username", "ProxyShield");
       this.discordTitle = node.getString("discord.title", "ProxyShield Alert");
       this.discordColor = node.getInt("discord.color", 0xFF0000);
+      this.discordEmbed = EmbedTemplate.from(node, this.discordTitle);
    }
 
    public static ShieldConfig from(ConfigNode node) {
@@ -850,6 +853,11 @@ public final class ShieldConfig {
 
    public String discordTitle() {
       return discordTitle;
+   }
+
+   /** The message layout, either as configured under {@code discord.embed} or the classic one. */
+   public EmbedTemplate discordEmbed() {
+      return discordEmbed;
    }
 
    public int discordColor() {

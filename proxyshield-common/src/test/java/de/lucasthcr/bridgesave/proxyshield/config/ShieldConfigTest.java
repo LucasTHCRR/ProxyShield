@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.lucasthcr.bridgesave.proxyshield.lookup.ProviderDefinition;
 import de.lucasthcr.bridgesave.proxyshield.net.IpRangeSet;
+import de.lucasthcr.bridgesave.proxyshield.notify.EmbedTemplate;
 import de.lucasthcr.bridgesave.proxyshield.testing.MapConfigNode;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -164,6 +165,30 @@ class ShieldConfigTest {
             "actions.on-flag", List.of("  /lp user {player} info  ", "", "   ", "/  webhook x"))));
 
       assertEquals(List.of("lp user {player} info", "webhook x"), config.flagCommands());
+   }
+
+   @Test
+   @DisplayName("The shipped embed section renders what the old fixed layout did")
+   void shippedEmbedMatchesTheClassicLayout() {
+      EmbedTemplate classic = EmbedTemplate.classic("ProxyShield Alert");
+      EmbedTemplate written = shipped.discordEmbed();
+
+      // config.yml now spells the layout out, so a fresh install reads the section rather than the
+      // fallback. If the two ever drift, every new server's alerts quietly change shape.
+      assertEquals(classic.title(), written.title());
+      assertEquals(classic.description(), written.description());
+      assertEquals(classic.thumbnail(), written.thumbnail());
+      assertEquals(classic.footer(), written.footer());
+      assertEquals(classic.fields(), written.fields());
+   }
+
+   @Test
+   @DisplayName("A config predating the embed section keeps the old layout")
+   void missingEmbedSectionFallsBackToClassic() {
+      ShieldConfig old = ShieldConfig.from(new MapConfigNode(Map.of("discord.title", "Mine")));
+
+      assertEquals(EmbedTemplate.classic("Mine").fields(), old.discordEmbed().fields());
+      assertEquals("Mine", old.discordEmbed().title());
    }
 
    @Test

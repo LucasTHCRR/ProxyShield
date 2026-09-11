@@ -29,11 +29,11 @@ identically.
 
 | Build | File | Runs on |
 |---|---|---|
-| Paper | `ProxyShield-Paper-2.3.0.jar` | Paper, Purpur and Spigot 1.21+ |
-| Folia | `ProxyShield-Folia-2.3.0.jar` | Folia |
-| BungeeCord | `ProxyShield-Bungee-2.3.0.jar` | BungeeCord / Waterfall |
-| Velocity | `ProxyShield-Velocity-2.3.0.jar` | Velocity 3.3+ |
-| Sponge | `ProxyShield-Sponge-2.3.0.jar` | SpongeAPI 17 |
+| Paper | `ProxyShield-Paper-2.4.0.jar` | Paper, Purpur and Spigot 1.21+ |
+| Folia | `ProxyShield-Folia-2.4.0.jar` | Folia |
+| BungeeCord | `ProxyShield-Bungee-2.4.0.jar` | BungeeCord / Waterfall |
+| Velocity | `ProxyShield-Velocity-2.4.0.jar` | Velocity 3.3+ |
+| Sponge | `ProxyShield-Sponge-2.4.0.jar` | SpongeAPI 17 |
 
 The Paper and Folia jars are built from the same sources and are interchangeable. The scheduling
 already uses the regionised API, so either one runs on either server. They exist separately because
@@ -82,7 +82,7 @@ address.
 - Shared storage for a network: MySQL, MariaDB, PostgreSQL, SQLite, H2 or Redis
 - PlaceholderAPI support and anonymous bStats metrics
 - Silent mode: no staff or console alerts, while the log file and webhook keep recording
-- Discord webhook with queueing, retry and rate-limit handling
+- Discord webhook with queueing, retry and rate-limit handling, and a layout you write yourself
 - Block log at `plugins/ProxyShield/blocks.log`
 - Full `/proxyshield` command set with tab completion
 - English and German out of the box, any language by copying one file
@@ -193,6 +193,32 @@ discord:
 ```
 
 `show-ip: false` posts `hidden` instead of the address. Only `https://` URLs are accepted.
+
+The message layout is yours to write. By default it is a title and six inline boxes; clear the
+fields and write a description instead:
+
+```yaml
+discord:
+  embed:
+    title: "`{player}`"
+    description: |
+      ```ansi
+      IP: `{ip}`
+      Country: {country}
+      Action: {action}
+      ```
+    thumbnail: "https://your-server.example/alert.gif"
+    fields: {}
+```
+
+Placeholders: `{player}` `{uuid}` `{ip}` `{reason}` `{country}` `{isp}` `{asn}` `{score}`
+`{sources}` `{platform}` `{version}` `{action}` `{action_id}`. Fields are named entries and appear
+in the order written.
+
+Values go in exactly as written, so you place the backticks. Discord parses embed text as Markdown
+and an underscore is a legal Minecraft name character, so without a code span `Some_Name` shows up
+italic and `__Name__` underlined with the underscores gone. Deleting the whole `embed` section
+keeps the layout from before 2.4.
 
 ### Storage on a network
 

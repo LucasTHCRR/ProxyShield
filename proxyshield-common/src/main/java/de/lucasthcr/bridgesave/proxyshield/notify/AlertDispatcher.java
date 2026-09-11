@@ -104,7 +104,7 @@ public final class AlertDispatcher {
          appendToLog(player, ip, verdict, enforced);
       }
 
-      webhook.enqueue(player, ip, verdict, enforced);
+      webhook.enqueue(player, uuid, ip, verdict, enforced);
       commands.onFlag(player, uuid, ip, verdict, enforced);
    }
 
