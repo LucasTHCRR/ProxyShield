@@ -85,7 +85,7 @@ reload-kept: "&7Die vorherige Konfiguration bleibt aktiv."
 # --- /proxyshield refresh ---
 refresh-running: "{prefix}&eEine Aktualisierung laeuft bereits."
 refresh-start: "{prefix}&7VPN-Listen werden geladen..."
-refresh-done: "{prefix}&aListen aktualisiert: &f{ranges} &aBereiche, &f{addresses} &aAdressen."
+refresh-done: "{prefix}&aListen aktualisiert: &f{ranges} &aBereiche, &f{addresses} &aIPv4-Adressen."
 refresh-failed: "{prefix}&cAktualisierung fehlgeschlagen: &f{error}"
 
 # --- /proxyshield recheck ---

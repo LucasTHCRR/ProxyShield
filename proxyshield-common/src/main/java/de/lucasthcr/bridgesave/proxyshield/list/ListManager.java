@@ -207,7 +207,9 @@ public final class ListManager {
          ranges = built;
          lastRefreshMillis = System.currentTimeMillis();
          platform.info("VPN lists ready: " + built.entryCount() + " entries compiled into "
-               + built.rangeCount() + " ranges covering " + built.addressCount() + " addresses.");
+               + built.rangeCount() + " ranges. IPv4: " + built.ipv4RangeCount() + " ranges covering "
+               + built.ipv4AddressCount() + " addresses. IPv6: " + built.ipv6RangeCount()
+               + " ranges.");
          return true;
       } finally {
          refreshing.set(false);

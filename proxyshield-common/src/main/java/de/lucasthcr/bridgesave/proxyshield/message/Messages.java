@@ -200,7 +200,7 @@ public final class Messages {
 
       m.put("refresh-running", "{prefix}&eA list refresh is already running.");
       m.put("refresh-start", "{prefix}&7Downloading VPN lists...");
-      m.put("refresh-done", "{prefix}&aLists updated: &f{ranges} &aranges, &f{addresses} &aaddresses.");
+      m.put("refresh-done", "{prefix}&aLists updated: &f{ranges} &aranges, &f{addresses} &aIPv4 addresses.");
       m.put("refresh-failed", "{prefix}&cRefresh failed: &f{error}");
 
       m.put("recheck-start", "{prefix}&7Re-checking every online player...");

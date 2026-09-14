@@ -139,26 +139,33 @@ public final class IpRangeSet {
       return rangeCount() == 0;
    }
 
-   /** Total number of addresses covered, saturating at {@link Long#MAX_VALUE}. */
-   public long addressCount() {
+   /**
+    * Number of IPv4 addresses covered.
+    * <p>
+    * Exact, and it cannot overflow: the ranges are merged and disjoint, so the total is at most
+    * 2^32.
+    * <p>
+    * There is deliberately no combined figure. A single IPv6 /64 already holds 2^64 addresses, so
+    * any total including IPv6 exceeds what a {@code long} can express and has to be reported as a
+    * saturated value, which then never changes no matter what the feeds contain. A number that
+    * does not move with its input is worse than no number, so IPv6 is reported by range instead.
+    */
+   public long ipv4AddressCount() {
       long total = 0;
       for (int i = 0; i < v4Start.length; i++) {
          total += v4End[i] - v4Start[i] + 1;
-         if (total < 0) {
-            return Long.MAX_VALUE;
-         }
-      }
-      for (int i = 0; i < v6Start.length; i++) {
-         BigInteger span = v6End[i].subtract(v6Start[i]).add(BigInteger.ONE);
-         if (span.bitLength() > 62) {
-            return Long.MAX_VALUE;
-         }
-         total += span.longValue();
-         if (total < 0) {
-            return Long.MAX_VALUE;
-         }
       }
       return total;
+   }
+
+   /** Merged IPv4 ranges. */
+   public int ipv4RangeCount() {
+      return v4Start.length;
+   }
+
+   /** Merged IPv6 ranges. These are counted rather than measured, see {@link #ipv4AddressCount()}. */
+   public int ipv6RangeCount() {
+      return v6Start.length;
    }
 
    /** Collects entries and produces the immutable, merged set. */

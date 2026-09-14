@@ -1,5 +1,28 @@
 # Changelog
 
+## 2.4.1
+
+### Fixed
+
+- **The address count in the startup log was always the same number.** Every start reported
+  `covering 9223372036854775807 addresses`, which is `Long.MAX_VALUE` and reads like a broken
+  counter. It was not arithmetic going wrong: the total saturated on purpose, but a single IPv6
+  `/64` already holds 2^64 addresses, so with the default feeds the guard tripped on the first
+  IPv6 range every time. The figure never moved with its input, which is the giveaway that it was
+  measuring nothing.
+
+  There is no combined total any more, because no `long` can hold one. IPv4 is counted exactly and
+  IPv6 is reported by range:
+
+  ```
+  VPN lists ready: 65295 entries compiled into 36349 ranges.
+  IPv4: 31078 ranges covering 392968591 addresses. IPv6: 5271 ranges.
+  ```
+
+  `IpRangeSet.addressCount()` is now `ipv4AddressCount()`, joined by `ipv4RangeCount()` and
+  `ipv6RangeCount()`. The `{addresses}` placeholder in `refresh-done` is IPv4 only and both
+  message files say so.
+
 ## 2.4.0
 
 ### Added

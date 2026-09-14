@@ -310,7 +310,7 @@ public final class CommandHandler {
          if (core.refreshLists()) {
             send(sender, "refresh-done", of(
                   "ranges", String.valueOf(core.lists().ranges().rangeCount()),
-                  "addresses", String.valueOf(core.lists().ranges().addressCount())));
+                  "addresses", String.valueOf(core.lists().ranges().ipv4AddressCount())));
          } else {
             String error = core.lists().lastError();
             send(sender, "refresh-failed", of("error", error == null ? "unknown" : error));

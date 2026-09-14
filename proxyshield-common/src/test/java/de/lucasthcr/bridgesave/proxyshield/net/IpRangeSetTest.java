@@ -45,7 +45,7 @@ class IpRangeSetTest {
          assertTrue(set.contains("1.2.3.1"), "first host");
          assertTrue(set.contains("1.2.3.128"), "middle host");
          assertTrue(set.contains("1.2.3.255"), "broadcast address");
-         assertEquals(256, set.addressCount());
+         assertEquals(256, set.ipv4AddressCount());
       }
 
       @Test
@@ -62,7 +62,7 @@ class IpRangeSetTest {
 
          assertTrue(set.contains("8.8.8.8"));
          assertFalse(set.contains("8.8.8.9"));
-         assertEquals(1, set.addressCount());
+         assertEquals(1, set.ipv4AddressCount());
       }
 
       @Test
@@ -117,7 +117,7 @@ class IpRangeSetTest {
          IpRangeSet set = IpRangeSet.of(List.of("1.0.0.0/24", "1.0.1.0/24", "1.0.2.0/24"));
 
          assertEquals(1, set.rangeCount());
-         assertEquals(768, set.addressCount());
+         assertEquals(768, set.ipv4AddressCount());
          assertTrue(set.contains("1.0.1.55"));
       }
 
@@ -126,7 +126,7 @@ class IpRangeSetTest {
          IpRangeSet set = IpRangeSet.of(List.of("2.0.0.0/16", "2.0.5.0/24"));
 
          assertEquals(1, set.rangeCount());
-         assertEquals(65536, set.addressCount());
+         assertEquals(65536, set.ipv4AddressCount());
          assertTrue(set.contains("2.0.5.5"));
       }
 
@@ -157,6 +157,20 @@ class IpRangeSetTest {
          IpRangeSet set = IpRangeSet.of(List.of("::1"));
 
          assertTrue(set.contains("0:0:0:0:0:0:0:1"));
+      }
+
+      @Test
+      @DisplayName("An IPv6 block is counted by range and leaves the IPv4 total alone")
+      void ipv6IsCountedByRangeNotByAddress() {
+         IpRangeSet mixed = IpRangeSet.of(List.of("1.0.0.0/24", "2001:db8::/32", "2001:dba::/32"));
+
+         // The whole point: a /32 holds 2^96 addresses, so any combined total would have to
+         // saturate and would then read the same no matter what the feeds contain. The IPv4
+         // figure has to stay exact and keep moving with its input.
+         assertEquals(256, mixed.ipv4AddressCount());
+         assertEquals(1, mixed.ipv4RangeCount());
+         assertEquals(2, mixed.ipv6RangeCount());
+         assertEquals(3, mixed.rangeCount());
       }
 
       @Test
@@ -210,6 +224,6 @@ class IpRangeSetTest {
    void emptySetMatchesNothing() {
       assertTrue(IpRangeSet.EMPTY.isEmpty());
       assertFalse(IpRangeSet.EMPTY.contains("1.2.3.4"));
-      assertEquals(0, IpRangeSet.EMPTY.addressCount());
+      assertEquals(0, IpRangeSet.EMPTY.ipv4AddressCount());
    }
 }
