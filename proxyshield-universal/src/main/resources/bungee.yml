@@ -1,0 +1,5 @@
+name: ProxyShield
+version: ${project.version}
+main: de.lucasthcr.bridgesave.proxyshield.bungee.BungeeMain
+author: LucasTHCR
+description: Anti-VPN and anti-proxy protection with country filtering, webhook alerts and a silent mode.

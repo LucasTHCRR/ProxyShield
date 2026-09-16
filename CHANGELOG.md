@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.5.0
+
+### Added
+
+- **One jar for every platform** (`ProxyShield-Universal-2.5.0.jar`). It carries all four entry
+  points and all four plugin descriptors, and each server reads the one it knows: Bukkit takes
+  `plugin.yml`, BungeeCord takes `bungee.yml` ahead of it, Velocity takes `velocity-plugin.json`
+  and Sponge takes `META-INF/sponge_plugins.json`. The same file drops into a Paper `plugins/`
+  folder, a BungeeCord one, a Velocity one or a Sponge `mods/` folder.
+
+  It is an extra download, not a replacement. The five per-platform jars are unchanged and remain
+  the plainer choice for a single server; the universal one saves a network running several of
+  them from fetching four files that differ in about a hundred classes.
+
+  Nothing in the plugin behaves differently. The universal build adds the platform modules' own
+  sources rather than copying them, so it cannot drift from the jar it mirrors, and the four
+  bStats artifacts it needs share one base and add a single class each. It costs roughly 400 KB
+  over a single-platform jar, almost all of it the bundled YAML parser that Velocity and Sponge
+  need and Bukkit does not.
+
 ## 2.4.1
 
 ### Fixed

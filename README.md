@@ -29,11 +29,18 @@ identically.
 
 | Build | File | Runs on |
 |---|---|---|
-| Paper | `ProxyShield-Paper-2.4.1.jar` | Paper, Purpur and Spigot 1.21+ |
-| Folia | `ProxyShield-Folia-2.4.1.jar` | Folia |
-| BungeeCord | `ProxyShield-Bungee-2.4.1.jar` | BungeeCord / Waterfall |
-| Velocity | `ProxyShield-Velocity-2.4.1.jar` | Velocity 3.3+ |
-| Sponge | `ProxyShield-Sponge-2.4.1.jar` | SpongeAPI 17 |
+| Paper | `ProxyShield-Paper-2.5.0.jar` | Paper, Purpur and Spigot 1.21+ |
+| Folia | `ProxyShield-Folia-2.5.0.jar` | Folia |
+| BungeeCord | `ProxyShield-Bungee-2.5.0.jar` | BungeeCord / Waterfall |
+| Velocity | `ProxyShield-Velocity-2.5.0.jar` | Velocity 3.3+ |
+| Sponge | `ProxyShield-Sponge-2.5.0.jar` | SpongeAPI 17 |
+| Universal | `ProxyShield-Universal-2.5.0.jar` | all five of the above, one file |
+
+The universal jar carries all four entry points and all four plugin descriptors at once. Every
+server reads the descriptor it knows and ignores the rest, so the same file drops into a Paper
+`plugins/` folder, a BungeeCord one, a Velocity one or a Sponge `mods/` folder. It costs about
+400 KB over a single-platform jar, which buys one download for a network running several of them.
+The per-platform jars are still the plainer choice when you only run one.
 
 The Paper and Folia jars are built from the same sources and are interchangeable. The scheduling
 already uses the regionised API, so either one runs on either server. They exist separately because

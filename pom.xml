@@ -6,7 +6,7 @@
 
     <groupId>de.lucasthcr.bridgesave</groupId>
     <artifactId>proxyshield-parent</artifactId>
-    <version>2.4.1</version>
+    <version>2.5.0</version>
     <packaging>pom</packaging>
 
     <name>ProxyShield</name>
@@ -19,6 +19,7 @@
         <module>proxyshield-bungee</module>
         <module>proxyshield-velocity</module>
         <module>proxyshield-sponge</module>
+        <module>proxyshield-universal</module>
     </modules>
 
     <properties>
