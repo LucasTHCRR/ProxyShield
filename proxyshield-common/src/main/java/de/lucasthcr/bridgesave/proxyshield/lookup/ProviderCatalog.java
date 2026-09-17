@@ -109,15 +109,21 @@ public final class ProviderCatalog {
             .rateLimit(60)
             .build());
 
+      // Without a key ipapi.is answers on its anonymous tier, which is eleven flat keys and none
+      // of the risk fields: no is_vpn, no is_datacenter, and company and asn are plain strings
+      // rather than objects. The flat paths are listed after the documented ones so a keyed
+      // install is unaffected and an unkeyed one still contributes the country, the ISP and the
+      // network instead of failing outright. It cannot contribute a VPN verdict either way, which
+      // is what warnIfVerdictless reports at start-up.
       put(catalog, ProviderDefinition.builder("ipapi-is", "https://api.ipapi.is/?q={ip}&key={key}")
             .optionalKey()
             .proxy("is_proxy", "is_vpn", "is_tor", "is_abuser")
             .hosting("is_datacenter")
             .tor("is_tor")
             .country("location.country_code")
-            .countryName("location.country")
-            .isp("asn.org")
-            .asn("asn.asn")
+            .countryName("location.country", "country")
+            .isp("asn.org", "company")
+            .asn("asn.asn", "asn")
             .connectionType("company.type")
             .weight(1.5)
             .rateLimit(60)

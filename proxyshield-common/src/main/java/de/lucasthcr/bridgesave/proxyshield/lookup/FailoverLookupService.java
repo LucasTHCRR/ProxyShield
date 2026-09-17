@@ -57,6 +57,13 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public final class FailoverLookupService implements LookupProvider, AutoCloseable {
 
+   /**
+    * How long a clean verdict survives when some providers never answered. Long enough that a
+    * burst of logins costs one round of requests, short enough that a rate limit cannot keep an
+    * address looking clean for the rest of the day.
+    */
+   private static final long INCOMPLETE_CLEAN_TTL_MILLIS = 300_000L;
+
    private final Platform platform;
    private final List<IpLookupService> providers;
    private final ExpiringCache<String, LookupResult> cache;
@@ -205,13 +212,14 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       }
 
       try {
-         LookupResult result = mode == ShieldConfig.LookupMode.FAILOVER
-               ? failover(ip)
+         Round round = mode == ShieldConfig.LookupMode.FAILOVER
+               ? new Round(failover(ip), true)
                : consensus(ip);
+         LookupResult result = round.result();
 
          lookups.incrementAndGet();
          if (result.resolved()) {
-            long ttl = result.proxy() || result.hosting() ? flaggedTtlMillis : cleanTtlMillis;
+            long ttl = ttlFor(round);
             cache.put(key, result, ttl);
             if (storage != null) {
                storage.put(key, new ShieldStorage.CachedVerdict(result,
@@ -278,7 +286,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
     * common case of an obvious VPN costs the latency of the fastest provider that recognises it,
     * not of the slowest one in the list.
     */
-   private LookupResult consensus(String ip) {
+   private Round consensus(String ip) {
       ExecutorCompletionService<ProviderAnswer> completions =
             new ExecutorCompletionService<>(executor);
       List<Future<ProviderAnswer>> pending = new ArrayList<>(providers.size());
@@ -314,6 +322,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
 
             merge.add(answer);
             if (merge.proxyScore >= requiredScore) {
+               merge.settledEarly();
                break;
             }
          }
@@ -325,13 +334,44 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
          }
       }
 
-      return merge.toResult(requiredScore);
+      return new Round(merge.toResult(requiredScore), merge.complete(pending.size()));
+   }
+
+   /**
+    * One round of questions and how much of it came back.
+    *
+    * @param complete whether every provider asked actually answered, or the round stopped early
+    *                 with a verdict already settled
+    */
+   private record Round(LookupResult result, boolean complete) {
+   }
+
+   /**
+    * How long an answer may be reused.
+    * <p>
+    * A clean verdict off an incomplete round is the dangerous one. One provider answering "not a
+    * proxy" is enough to resolve the round, so a rate limit or a timeout on the single provider
+    * that would have flagged the address produces a clean answer that then sits in the cache for
+    * the full six hours, surviving restarts through lookup-cache.json. The address keeps passing
+    * long after the providers recovered, and nothing in the log says why. An incomplete clean
+    * round is therefore kept only long enough to absorb a burst of logins.
+    */
+   private long ttlFor(Round round) {
+      LookupResult result = round.result();
+      if (result.proxy() || result.hosting()) {
+         return flaggedTtlMillis;
+      }
+      return round.complete()
+            ? cleanTtlMillis
+            : Math.min(cleanTtlMillis, INCOMPLETE_CLEAN_TTL_MILLIS);
    }
 
    /** Accumulates provider answers into one verdict. */
    private static final class Merge {
 
       private final LinkedHashSet<String> flaggedBy = new LinkedHashSet<>();
+      private int answered;
+      private int settledEarly;
       private double proxyScore;
       private double hostingScore;
       private boolean resolved;
@@ -350,6 +390,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
             return;
          }
 
+         answered++;
          resolved = true;
          double weight = answer.weight();
          if (result.proxy() || result.tor()) {
@@ -367,6 +408,19 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
          isp = firstNonNull(isp, result.isp());
          asn = firstNonNull(asn, result.asn());
          connectionType = firstNonNull(connectionType, result.connectionType());
+      }
+
+      /** Marks that the loop stopped on a settled verdict rather than on a missing answer. */
+      void settledEarly() {
+         settledEarly++;
+      }
+
+      /**
+       * Whether the verdict rests on the full picture. Stopping early because the score was
+       * already reached counts as complete: the remaining answers could not have changed it.
+       */
+      boolean complete(int asked) {
+         return settledEarly > 0 || answered >= asked;
       }
 
       LookupResult toResult(double requiredScore) {

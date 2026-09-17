@@ -29,12 +29,12 @@ identically.
 
 | Build | File | Runs on |
 |---|---|---|
-| Paper | `ProxyShield-Paper-2.5.0.jar` | Paper, Purpur and Spigot 1.21+ |
-| Folia | `ProxyShield-Folia-2.5.0.jar` | Folia |
-| BungeeCord | `ProxyShield-Bungee-2.5.0.jar` | BungeeCord / Waterfall |
-| Velocity | `ProxyShield-Velocity-2.5.0.jar` | Velocity 3.3+ |
-| Sponge | `ProxyShield-Sponge-2.5.0.jar` | SpongeAPI 17 |
-| Universal | `ProxyShield-Universal-2.5.0.jar` | all five of the above, one file |
+| Paper | `ProxyShield-Paper-2.5.1.jar` | Paper, Purpur and Spigot 1.21+ |
+| Folia | `ProxyShield-Folia-2.5.1.jar` | Folia |
+| BungeeCord | `ProxyShield-Bungee-2.5.1.jar` | BungeeCord / Waterfall |
+| Velocity | `ProxyShield-Velocity-2.5.1.jar` | Velocity 3.3+ |
+| Sponge | `ProxyShield-Sponge-2.5.1.jar` | SpongeAPI 17 |
+| Universal | `ProxyShield-Universal-2.5.1.jar` | all five of the above, one file |
 
 The universal jar carries all four entry points and all four plugin descriptors at once. Every
 server reads the descriptor it knows and ignores the rest, so the same file drops into a Paper

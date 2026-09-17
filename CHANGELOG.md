@@ -1,5 +1,68 @@
 # Changelog
 
+## 2.5.1
+
+### Fixed
+
+Five defects that let a commercial VPN connect unflagged, and they compound: with the shipped
+configuration, four of six real ProtonVPN exits passed every check. After this release all six are
+stopped, and ten consumer ISP and mobile addresses across seven countries still connect.
+
+- **`business` counted as a residential connection**, so `detection.allow-residential-hosting`
+  waved every VPN operator past the hosting block. In iplocate's vocabulary a home line is `isp`,
+  a datacenter is `hosting`, and `business` is a corporate network, which is exactly what a VPN
+  company announcing its own ASN looks like. Proton AG comes back as `business`. The exemption
+  now covers residential, mobile, cellular and `isp` only. An office or a school is `business`
+  too, but a provider reports hosting for one of those only by mistake, and the carrier ranges
+  this option exists for are `isp`.
+
+- **The reverse DNS check found no name for any VPN exit.** It went through
+  `InetAddress.getCanonicalHostName()`, which performs a forward confirmed reverse lookup: it
+  reads the PTR, resolves the name it got back, and discards it unless the original address is
+  among the answers. VPN operators routinely publish a PTR with no matching A record, so the
+  confirmation failed and the JDK handed back the literal, which reads as "no PTR at all".
+  ProtonVPN is the case that exposed it: every exit answers `185-70-41-1.protonmail.ch` to `dig`
+  and that name has no A record, so the check saw nothing on precisely the addresses it exists to
+  catch. The PTR record is now read directly. The JDK call remains as a fallback where JNDI is
+  unavailable.
+
+  The DNS context is built once and reused. Creating one costs about 80 ms, which on the shipped
+  700 ms budget was most of a lookup, and building it per query made the first lookup after a
+  restart time out. Warm lookups take about a millisecond.
+
+- **The one built-in rDNS pattern aimed at Proton never matched Proton.** The list carried
+  `protonvpn`; Proton names its exits after the mail brand. Of the seventeen ranges Proton
+  announces, ten publish a PTR and not one matched. `protonmail` is now in the list, and `hosted`
+  joins `hosting`, because `hosted-by-<name>.net` is a common shape the longer word does not
+  cover.
+
+- **A clean verdict from an incomplete round was cached for six hours.** One provider answering
+  "not a proxy" is enough to settle a consensus round, so a rate limit or a timeout on the single
+  provider that would have flagged the address produced a clean answer that then sat in the cache
+  for the full `api.cache-minutes` and survived restarts through `lookup-cache.json`. The address
+  kept passing long after the providers recovered, and nothing in the log said why. Clearing the
+  cache was the only way out of it, and nothing pointed there.
+
+  A clean verdict now gets the configured lifetime only when every provider actually answered. If
+  any of them failed or the budget ran out, it is kept for five minutes instead, which still
+  absorbs a burst of logins. A flagged verdict is unaffected, and so is a round that stopped early
+  because the score was already reached: the answers still outstanding could not have changed it.
+
+  `/proxyshield clearcache` empties both the in-memory cache and the stored one, which is the
+  supported way to force a re-check.
+
+- **`ipapi-is` failed on every request and said so nowhere.** It is the highest weighted provider
+  in the shipped configuration at 1.5, and without a key ipapi.is answers on its anonymous tier:
+  eleven flat keys, none of the risk fields, with `company` and `asn` as plain strings rather than
+  objects. Every documented path found nothing, so the provider returned `response carried none of
+  the expected fields` on every lookup and silently contributed zero.
+
+  It now reads the anonymous shape as well, so an unkeyed install still gets the country, the ISP
+  and the network from it, and a keyed install is untouched. It still cannot contribute a VPN
+  verdict without a key, so the first time any provider answers without a single risk field the
+  console says which provider, what it costs and what to do about it. A service quietly scoring
+  zero for months is the failure this prevents.
+
 ## 2.5.0
 
 ### Added

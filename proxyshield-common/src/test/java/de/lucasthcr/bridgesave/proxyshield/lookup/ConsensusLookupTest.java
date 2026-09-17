@@ -44,6 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -260,6 +261,154 @@ class ConsensusLookupTest {
 
          assertTrue(restored.proxy(), "the stored verdict should come back");
          assertEquals(1, hits.get(), "a restart must not re-query what was already known");
+      }
+   }
+
+   /** Captures what the service asked to be persisted, so the TTL is observable. */
+   private static final class CapturingStorage implements ShieldStorage {
+
+      private final Map<String, CachedVerdict> written = new LinkedHashMap<>();
+
+      @Override
+      public String name() {
+         return "capturing";
+      }
+
+      @Override
+      public boolean available() {
+         return true;
+      }
+
+      @Override
+      public boolean shared() {
+         return false;
+      }
+
+      @Override
+      public Map<String, CachedVerdict> preload() {
+         return Map.of();
+      }
+
+      @Override
+      public java.util.Optional<CachedVerdict> find(String key) {
+         return java.util.Optional.ofNullable(written.get(key));
+      }
+
+      @Override
+      public void put(String key, CachedVerdict verdict) {
+         written.put(key, verdict);
+      }
+
+      @Override
+      public void invalidate(String key) {
+         written.remove(key);
+      }
+
+      @Override
+      public void clearVerdicts() {
+         written.clear();
+      }
+
+      @Override
+      public Map<java.util.UUID, TrustRecord> loadTrust() {
+         return Map.of();
+      }
+
+      @Override
+      public void saveTrust(Map<java.util.UUID, TrustRecord> records) {
+      }
+
+      @Override
+      public void close() {
+      }
+
+      long ttlMillisFor(String key) {
+         CachedVerdict verdict = written.get(key);
+         return verdict == null ? -1 : verdict.expiresAt() - System.currentTimeMillis();
+      }
+   }
+
+   @Nested
+   @DisplayName("How long a clean answer may be reused")
+   class CleanVerdictLifetime {
+
+      private Map<String, Object> config(double requiredScore, String... paths) {
+         Map<String, Object> values = new LinkedHashMap<>();
+         values.put("api.mode", "consensus");
+         values.put("api.required-score", requiredScore);
+         values.put("api.cache-minutes", 360);
+         values.put("api.flagged-cache-minutes", 1440);
+         values.put("api.total-timeout-seconds", 10);
+         int index = 0;
+         for (String path : paths) {
+            String id = "p" + index++;
+            values.put("api.providers." + id + ".enabled", true);
+            values.put("api.providers." + id + ".url", baseUrl + path + "/{ip}");
+            values.put("api.providers." + id + ".weight", 1.0);
+            values.put("api.providers." + id + ".proxy-fields", List.of("proxy"));
+            values.put("api.providers." + id + ".hosting-fields", List.of("hosting"));
+         }
+         return values;
+      }
+
+      @Test
+      @DisplayName("Every provider answered clean, so the full cache time applies")
+      void completeCleanRoundIsKeptForTheFullTime() {
+         serve("/allclean1", exchange -> respond(exchange, 200, "{\"proxy\":false}"));
+         serve("/allclean2", exchange -> respond(exchange, 200, "{\"proxy\":false}"));
+
+         CapturingStorage storage = new CapturingStorage();
+         try (FailoverLookupService service = new FailoverLookupService(platform,
+               ShieldConfig.from(new MapConfigNode(config(2.0, "/allclean1", "/allclean2"))),
+               null, storage)) {
+            assertFalse(service.lookup(IP).proxy());
+         }
+
+         assertTrue(storage.ttlMillisFor(IP) > 300_000L,
+               "a complete clean round is worth the configured six hours");
+      }
+
+      /**
+       * The failure mode this guards: one provider answering "not a proxy" is enough to resolve
+       * the round, so a rate limit or a timeout on the provider that would have flagged the
+       * address used to produce a clean answer that sat in the cache for six hours and survived
+       * restarts through lookup-cache.json. The address kept passing long after the providers
+       * recovered.
+       */
+      @Test
+      @DisplayName("A provider that never answered cuts the clean answer short")
+      void incompleteCleanRoundExpiresQuickly() {
+         serve("/halfclean", exchange -> respond(exchange, 200, "{\"proxy\":false}"));
+         serve("/halfdown", exchange -> respond(exchange, 500, ""));
+
+         CapturingStorage storage = new CapturingStorage();
+         try (FailoverLookupService service = new FailoverLookupService(platform,
+               ShieldConfig.from(new MapConfigNode(config(2.0, "/halfclean", "/halfdown"))),
+               null, storage)) {
+            assertFalse(service.lookup(IP).proxy());
+         }
+
+         long ttl = storage.ttlMillisFor(IP);
+         assertTrue(ttl > 0 && ttl <= 300_000L,
+               "an incomplete clean round may only absorb a burst, not the rest of the day, "
+                     + "but was kept for " + ttl + "ms");
+      }
+
+      @Test
+      @DisplayName("A flagged answer keeps its own cache time even off a short round")
+      void flaggedRoundIsUnaffected() {
+         serve("/flagfast", exchange -> respond(exchange, 200, "{\"proxy\":true}"));
+         serve("/flagdown", exchange -> respond(exchange, 500, ""));
+
+         CapturingStorage storage = new CapturingStorage();
+         try (FailoverLookupService service = new FailoverLookupService(platform,
+               ShieldConfig.from(new MapConfigNode(config(1.0, "/flagfast", "/flagdown"))),
+               null, storage)) {
+            assertTrue(service.lookup(IP).proxy());
+         }
+
+         assertTrue(storage.ttlMillisFor(IP) > 300_000L,
+               "stopping early on a settled verdict is not an incomplete round");
       }
    }
 

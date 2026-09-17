@@ -206,6 +206,62 @@ class CheckEngineTest {
    }
 
    @Nested
+   @DisplayName("The residential exemption to the hosting block")
+   class ResidentialExemption {
+
+      private CheckEngine engineFor(String connectionType) throws IOException {
+         return engine(baseConfig(),
+               ip -> LookupResult.of(false, true, false, "CH", "Switzerland", "Proton AG",
+                     "AS62371", connectionType, 0.0, List.of("iplocate")),
+               List.of());
+      }
+
+      /**
+       * A VPN operator announcing its own network is labelled "business" by iplocate,
+       * "business" counted as residential, and so every ProtonVPN exit walked straight past
+       * detection.block-hosting. A corporate network is not a home connection, and a real office
+       * is not reported as hosting to begin with.
+       */
+      @Test
+      @DisplayName("business is a corporate network, not a home one")
+      void businessDoesNotExemptFromTheHostingBlock() throws IOException {
+         CheckVerdict verdict = engineFor("business")
+               .check("Steve", null, "185.70.41.1", CheckEngine.PermissionProbe.NONE);
+
+         assertTrue(verdict.blocked(), "a VPN operator's own ASN must not be waved through");
+         assertEquals(CheckVerdict.Reason.HOSTING, verdict.reason());
+      }
+
+      @Test
+      @DisplayName("isp still exempts, which is what the option exists for")
+      void ispStillExempts() throws IOException {
+         CheckVerdict verdict = engineFor("isp")
+               .check("Steve", null, "203.0.113.7", CheckEngine.PermissionProbe.NONE);
+
+         assertFalse(verdict.blocked(), "carrier ranges are the false positive this prevents");
+      }
+
+      @Test
+      @DisplayName("mobile still exempts")
+      void mobileStillExempts() throws IOException {
+         CheckVerdict verdict = engineFor("mobile")
+               .check("Steve", null, "203.0.113.7", CheckEngine.PermissionProbe.NONE);
+
+         assertFalse(verdict.blocked());
+      }
+
+      @Test
+      @DisplayName("hosting is blocked, as it always was")
+      void hostingIsBlocked() throws IOException {
+         CheckVerdict verdict = engineFor("hosting")
+               .check("Steve", null, "203.0.113.7", CheckEngine.PermissionProbe.NONE);
+
+         assertTrue(verdict.blocked());
+         assertEquals(CheckVerdict.Reason.HOSTING, verdict.reason());
+      }
+   }
+
+   @Nested
    @DisplayName("Country filter")
    class Country {
 

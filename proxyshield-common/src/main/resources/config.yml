@@ -1,5 +1,5 @@
 # ============================================================================
-#  ProxyShield v2.5.0  -  Anti-VPN / Anti-Proxy
+#  ProxyShield v2.5.1  -  Anti-VPN / Anti-Proxy
 #  Paper - Folia - BungeeCord - Velocity - Sponge
 #
 #  Every option below behaves identically on all five platforms.
@@ -88,8 +88,11 @@ detection:
     weight: 1.0
 
     # Leave empty to use the built-in list (vpn, proxy, tor-exit, torguard, nordvpn,
-    # expressvpn, surfshark, cyberghost, mullvad, protonvpn, datacenter, hosting,
-    # colo, cloud, server, dedicated, vps and more).
+    # expressvpn, surfshark, cyberghost, mullvad, protonvpn, protonmail, datacenter,
+    # hosting, hosted, colo, cloud, server, dedicated, vps and more).
+    #
+    # "protonmail" is not a typo: ProtonVPN names its exits after the mail brand,
+    # so a Swiss exit answers 185-70-41-1.protonmail.ch.
     patterns: []
 
 country:

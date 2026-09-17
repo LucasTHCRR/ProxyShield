@@ -53,6 +53,89 @@ class ProviderParsingTest {
    }
 
    @Nested
+   @DisplayName("Free tiers that answer without a verdict")
+   class AnonymousTiers {
+
+      /**
+       * The exact body api.ipapi.is returns without a key. Every risk field the paid tier
+       * documents is absent, and company and asn are flat strings rather than objects, so the
+       * documented paths find nothing. Before this was handled the highest weighted provider in
+       * the shipped configuration failed on every single request and said so nowhere.
+       */
+      private static final String IPAPI_IS_ANONYMOUS = """
+            {"ip":"185.70.41.1","is_bogon":false,"company":"ProtonVPN CH2",
+             "asn":"AS209103 Proton AG","city":"Plan-les-Ouates","region":"Geneva",
+             "country":"Switzerland","lat":46.16789,"lon":6.11664,
+             "timezone":"Europe/Zurich","docs":"https://ipapi.is/free-tier.html"}""";
+
+      @Test
+      @DisplayName("The unkeyed answer resolves and still identifies the network")
+      void anonymousTierStillIdentifies() {
+         LookupResult result = parse("ipapi-is", IPAPI_IS_ANONYMOUS);
+
+         assertTrue(result.resolved(), "an answer we can read is not a failure");
+         assertEquals("Switzerland", result.countryName());
+         assertEquals("ProtonVPN CH2", result.isp());
+         // The flat string carries the org name too; normalizeAsn keeps only the number, which
+         // is what asn.blocked in config.yml is written against.
+         assertEquals("AS209103", result.asn());
+      }
+
+      @Test
+      @DisplayName("It carries no verdict, so it flags nothing and scores nothing")
+      void anonymousTierFlagsNothing() {
+         LookupResult result = parse("ipapi-is", IPAPI_IS_ANONYMOUS);
+
+         assertFalse(result.proxy());
+         assertFalse(result.hosting());
+         assertFalse(result.tor());
+         assertEquals(0.0, result.confidence());
+      }
+
+      @Test
+      @DisplayName("The operator is told once that the provider cannot flag anything")
+      void anonymousTierIsReportedOnce() {
+         RecordingPlatform platform = new RecordingPlatform(tempDir);
+         IpLookupService service = new IpLookupService(platform,
+               ShieldConfig.from(new MapConfigNode(Map.of())),
+               ProviderCatalog.byId("ipapi-is"));
+
+         service.parse(IPAPI_IS_ANONYMOUS, IP);
+         service.parse(IPAPI_IS_ANONYMOUS, IP);
+
+         long warnings = platform.warnings().stream()
+               .filter(line -> line.contains("ipapi-is") && line.contains("no proxy, VPN or "
+                     + "hosting field"))
+               .count();
+         assertEquals(1, warnings, "a per-request warning would drown the console");
+      }
+
+      @Test
+      @DisplayName("A keyed answer keeps the documented shape and is not warned about")
+      void keyedAnswerIsUntouched() {
+         RecordingPlatform platform = new RecordingPlatform(tempDir);
+         IpLookupService service = new IpLookupService(platform,
+               ShieldConfig.from(new MapConfigNode(Map.of())),
+               ProviderCatalog.byId("ipapi-is"));
+
+         LookupResult result = service.parse("""
+               {"ip":"185.70.41.1","is_datacenter":true,"is_vpn":true,"is_proxy":false,
+                "is_tor":false,"is_abuser":false,
+                "location":{"country":"Switzerland","country_code":"CH"},
+                "asn":{"asn":"AS62371","org":"Proton AG"},
+                "company":{"name":"Proton AG","type":"hosting"}}""", IP);
+
+         assertTrue(result.proxy(), "is_vpn still has to win");
+         assertTrue(result.hosting());
+         assertEquals("CH", result.countryCode());
+         assertEquals("Proton AG", result.isp());
+         assertEquals("AS62371", result.asn());
+         assertEquals("hosting", result.connectionType());
+         assertTrue(platform.warnings().stream().noneMatch(l -> l.contains("no proxy, VPN or")));
+      }
+   }
+
+   @Nested
    @DisplayName("Nested paths")
    class NestedPaths {
 

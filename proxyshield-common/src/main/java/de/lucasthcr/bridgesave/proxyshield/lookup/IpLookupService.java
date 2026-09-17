@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -59,6 +60,9 @@ public final class IpLookupService implements LookupProvider {
    private final ProviderDefinition definition;
    private final int timeoutMillis;
    private final TokenBucket limiter;
+
+   /** One warning per provider, the first time it answers without any risk field. */
+   private final AtomicBoolean verdictlessWarned = new AtomicBoolean();
 
    private final AtomicLong rateLimited = new AtomicLong();
    private final AtomicLong queries = new AtomicLong();
@@ -294,6 +298,18 @@ public final class IpLookupService implements LookupProvider {
          return LookupResult.failed("response carried none of the expected fields");
       }
 
+      // Identification without a verdict is the shape a free tier takes when the paid one holds
+      // the risk fields. The answer is still worth having for the country and the network, but an
+      // operator counting on this provider to catch VPNs has to hear about it once: silently
+      // scoring zero every time is how a service can sit in the config for months doing nothing.
+      if (!carriesRiskField(node, score) && verdictlessWarned.compareAndSet(false, true)) {
+         platform.warn("Provider " + definition.id() + " answered for " + host()
+               + " but its response carries no proxy, VPN or hosting field, so it cannot flag "
+               + "anything and contributes 0 of its " + definition.weight() + " weight. Its free "
+               + "tier most likely returns identification only. Add a key under api.providers."
+               + definition.id() + ".key, or disable it and raise another provider's weight.");
+      }
+
       return LookupResult.of(proxy, hosting, tor,
             firstString(node, definition.countryPaths()),
             firstString(node, definition.countryNamePaths()),
@@ -302,6 +318,22 @@ public final class IpLookupService implements LookupProvider {
             firstString(node, definition.connectionTypePaths()),
             proxy ? definition.weight() : 0.0,
             proxy || hosting ? List.of(definition.id()) : List.of());
+   }
+
+   /** Whether the answer carried any risk field at all, true or false. */
+   private boolean carriesRiskField(Object node, Double score) {
+      if (score != null) {
+         return true;
+      }
+      for (List<String> paths : List.of(definition.proxyPaths(), definition.hostingPaths(),
+            definition.torPaths())) {
+         for (String path : paths) {
+            if (Json.path(node, path) != null) {
+               return true;
+            }
+         }
+      }
+      return false;
    }
 
    /** Whether any documented field was present at all, flag or not. */

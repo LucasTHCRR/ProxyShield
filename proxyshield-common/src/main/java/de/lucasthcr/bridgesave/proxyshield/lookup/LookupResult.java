@@ -140,6 +140,12 @@ public record LookupResult(
     * <p>
     * Mobile carriers using CGNAT are the classic false positive for a hosting block, so a provider
     * that tells us the connection type is allowed to override it.
+    * <p>
+    * {@code business} used to count here and must not: in iplocate's vocabulary it means a
+    * corporate network, which is exactly what a VPN operator announcing its own ASN looks like.
+    * Proton AG comes back as {@code business}, so every ProtonVPN exit was waved past the hosting
+    * block. An office or a school is {@code business} too, but a provider only reports hosting for
+    * one of those by mistake, and {@code isp} still covers the carriers this exemption exists for.
     */
    public boolean residentialOrMobile() {
       if (connectionType == null) {
@@ -147,6 +153,6 @@ public record LookupResult(
       }
       String type = connectionType.toLowerCase(Locale.ROOT);
       return type.contains("residential") || type.contains("mobile") || type.contains("cellular")
-            || type.equals("isp") || type.equals("business");
+            || type.equals("isp");
    }
 }
