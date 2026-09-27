@@ -16,6 +16,7 @@
 [![Available for Waterfall](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/waterfall_vector.svg)](https://papermc.io/software/waterfall)
 [![Available for Velocity](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/velocity_vector.svg)](https://papermc.io/software/velocity)
 
+[![Watch us on YouTube](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/social/youtube-plural_vector.svg)](https://www.youtube.com/watch?v=p5o02yoP04Q)
 [![Chat with us on Discord](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/social/discord-plural_vector.svg)](https://dc.gg/paperstream)
 [![Available on Codeberg](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/available/codeberg_vector.svg)](https://codeberg.org/LucasTHCR/ProxyShield)
 
@@ -55,6 +56,8 @@ Install **one** jar, on the machine that accepts the connection. On a network th
 address.
 
 ---
+
+**[Watch ProxyShield in action](https://www.youtube.com/watch?v=p5o02yoP04Q)** — a short demonstration of the checks, the verdict and what a blocked connection looks like.
 
 ## Features
 
