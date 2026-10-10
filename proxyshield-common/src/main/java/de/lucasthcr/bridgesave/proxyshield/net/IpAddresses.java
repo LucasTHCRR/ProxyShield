@@ -103,6 +103,57 @@ public final class IpAddresses {
    }
 
    /**
+    * Whether the address sits in a range that is never routed on the public internet and is not
+    * one of the private ranges {@link #isLocal(byte[])} already lets through.
+    * <p>
+    * A real player cannot arrive from documentation, benchmark, multicast or reserved space, so a
+    * connection claiming one of these came through a forwarding layer that was lied to. Carrier
+    * grade NAT (100.64.0.0/10) is deliberately absent: overlay networks such as Tailscale hand
+    * those out to legitimate machines inside a network.
+    */
+   public static boolean isBogon(String input) {
+      byte[] address = parseLiteral(input);
+      return address != null && isBogon(address);
+   }
+
+   public static boolean isBogon(byte[] address) {
+      if (address.length == 4) {
+         int a = address[0] & 0xFF;
+         int b = address[1] & 0xFF;
+         int c = address[2] & 0xFF;
+         return a == 0
+               || (a == 192 && b == 0 && (c == 0 || c == 2))
+               || (a == 198 && (b == 18 || b == 19))
+               || (a == 198 && b == 51 && c == 100)
+               || (a == 203 && b == 0 && c == 113)
+               || a >= 224;
+      }
+      if (address.length == 16) {
+         int a = address[0] & 0xFF;
+         int b = address[1] & 0xFF;
+         int c = address[2] & 0xFF;
+         int d = address[3] & 0xFF;
+         if (a == 0xFF) {
+            return true; // multicast
+         }
+         if (a == 0x20 && b == 0x01 && c == 0x0D && d == 0xB8) {
+            return true; // 2001:db8::/32, documentation
+         }
+         // 100::/64, discard-only
+         if (a != 0x01 || b != 0) {
+            return false;
+         }
+         for (int i = 2; i < 8; i++) {
+            if (address[i] != 0) {
+               return false;
+            }
+         }
+         return true;
+      }
+      return false;
+   }
+
+   /**
     * The key an address is cached and rate-limited under.
     * <p>
     * IPv6 clients routinely get a whole /64 and rotate the host part, so caching the full address

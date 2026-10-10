@@ -24,8 +24,10 @@ import de.lucasthcr.bridgesave.proxyshield.net.IpAddresses;
 import de.lucasthcr.bridgesave.proxyshield.platform.Platform;
 import de.lucasthcr.bridgesave.proxyshield.storage.ShieldStorage;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -378,7 +380,8 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       private boolean tor;
       private String countryCode;
       private String countryName;
-      private String isp;
+      private final Map<String, Integer> ispVotes = new LinkedHashMap<>();
+      private final Map<String, String> ispSpelling = new LinkedHashMap<>();
       private String asn;
       private String connectionType;
       private String lastFailure = "no provider answered";
@@ -405,7 +408,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
 
          countryCode = firstNonNull(countryCode, result.countryCode());
          countryName = firstNonNull(countryName, result.countryName());
-         isp = firstNonNull(isp, result.isp());
+         voteIsp(result.isp());
          asn = firstNonNull(asn, result.asn());
          connectionType = firstNonNull(connectionType, result.connectionType());
       }
@@ -431,8 +434,38 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
          // a datacenter address take the proxy path and skip both detection.block-hosting and the
          // residential exemption.
          return LookupResult.of(proxyScore >= requiredScore, hostingScore >= requiredScore, tor,
-               countryCode, countryName, isp, asn, connectionType, proxyScore,
+               countryCode, countryName, isp(), asn, connectionType, proxyScore,
                List.copyOf(flaggedBy));
+      }
+
+      /**
+       * Providers disagree on the name more often than on anything else: one reports the
+       * operator, another the registrant of the block ("APNIC Research and Development" for
+       * Cloudflare's 1.1.1.1). Taking whichever answered first made the ISP filter depend on
+       * network timing, so the name most providers agree on wins, ties going to the earliest.
+       */
+      private void voteIsp(String name) {
+         if (name == null || name.isBlank()) {
+            return;
+         }
+         String key = name.toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]", "");
+         if (key.isEmpty()) {
+            return;
+         }
+         ispVotes.merge(key, 1, Integer::sum);
+         ispSpelling.putIfAbsent(key, name.trim());
+      }
+
+      private String isp() {
+         String best = null;
+         int votes = 0;
+         for (Map.Entry<String, Integer> entry : ispVotes.entrySet()) {
+            if (entry.getValue() > votes) {
+               best = entry.getKey();
+               votes = entry.getValue();
+            }
+         }
+         return best == null ? null : ispSpelling.get(best);
       }
 
       private static String firstNonNull(String current, String candidate) {

@@ -1,5 +1,5 @@
 # ============================================================================
-#  ProxyShield v2.5.1  -  Anti-VPN / Anti-Proxy
+#  ProxyShield v3.0.0  -  Anti-VPN / Anti-Proxy
 #  Paper - Folia - BungeeCord - Velocity - Sponge
 #
 #  Every option below behaves identically on all five platforms.
@@ -19,6 +19,11 @@ settings:
 
   # Players with this permission skip every check.
   bypass-permission: "proxyshield.bypass"
+
+  # Print every provider answer to the console, raw body included. Useful for working
+  # out why an address was or was not flagged, and for writing conditions (see the
+  # "your own" provider example under api.providers). Leave off in normal operation.
+  debug: false
 
 detection:
   # Detect and report, but never actually kick. Use this to hunt false positives
@@ -50,6 +55,17 @@ detection:
   # /proxyshield recheck
   recheck-online-on-reload: false
 
+  # Passive mode: nothing is checked at login. /proxyshield check and the API for other
+  # plugins keep working, so another anti-VPN can do the blocking while ProxyShield is
+  # used to look addresses up by hand.
+  passive: false
+
+  # Refuse addresses that can never belong to a real player: documentation, benchmark,
+  # multicast and reserved ranges (0.0.0.0/8, 192.0.2.0/24, 198.18.0.0/15, 224.0.0.0/4,
+  # 2001:db8::/32 and friends). One of these at login means a forwarding layer was lied
+  # to. Private and Tailscale style ranges are not affected.
+  block-bogon: true
+
   # ---------------------------------------------------------------- network (ASN) rules
   #
   # Address lists always lag behind: a VPN rents a new range and the public feeds
@@ -71,6 +87,12 @@ detection:
     # Networks that are never blocked. Use this for your own hosting, a school or
     # a mobile carrier that keeps getting flagged.
     allowed: []
+
+    # Downloadable lists of networks to block, refreshed together with the address lists
+    # below. Each source is an https URL serving either a JSON array (numbers, strings
+    # like "AS9009", or objects with an "asn" field) or plain text with one network per
+    # line. The last good download is kept in asn-cache.txt.
+    sources: []
 
   # ---------------------------------------------------------------- reverse DNS
   #
@@ -94,6 +116,19 @@ detection:
     # "protonmail" is not a typo: ProtonVPN names its exits after the mail brand,
     # so a Swiss exit answers 185-70-41-1.protonmail.ch.
     patterns: []
+
+  # ---------------------------------------------------------------- ISP filter
+  #
+  # Match the ISP name a provider reports. Entries are case-insensitive regular
+  # expressions; anything that is not a valid one is matched literally. "allowed" wins
+  # over everything after it, including the proxy and hosting flags, so it is the
+  # place for a mobile carrier or a school that keeps getting flagged.
+  isp:
+    blocked: []
+    # blocked:
+    #   - "m247"
+    #   - "^datacamp"
+    allowed: []
 
 country:
   # Country filtering needs provider data, so the providers are queried even when
@@ -184,6 +219,59 @@ heuristics:
 
   # How much a triggered heuristic contributes to the score.
   weight: 1.0
+
+# ============================================================================
+#  Connection limit
+#
+#  A hard cap on accounts per address. Unlike heuristics.max-accounts-per-ip, which
+#  only adds weight, a connection over this limit is refused outright. Whitelisted,
+#  local and bypassing players are never counted against it.
+# ============================================================================
+limiter:
+  enabled: false
+
+  # Accounts allowed per address. Keep this above 1: siblings and housemates share
+  # an address, and so do players behind the same mobile carrier.
+  max-per-ip: 3
+
+  # "disable": count players online from the address right now; a slot frees up as
+  #            soon as somebody leaves.
+  # "30m", "2h": count accounts admitted from the address inside that window, which
+  #            also stops a bot that rejoins on a fresh name. Resets on its own.
+  window: "disable"
+
+# ============================================================================
+#  Restricted servers (BungeeCord and Velocity only)
+#
+#  Instead of disconnecting a flagged player, keep them on the backends listed here,
+#  for example the lobby and the login server. They can still talk and appeal, but
+#  cannot reach the game modes. Ignored on Paper, Folia and Sponge.
+# ============================================================================
+restricted:
+  enabled: false
+
+  # whitelist: only the listed servers are allowed
+  # blacklist: every server except the listed ones is allowed
+  mode: whitelist
+
+  # Backend names as in your proxy config. Regular expressions, matched against the
+  # whole name and case-insensitively, so "lobby-\\d+" covers lobby-1, lobby-2...
+  servers: []
+  # servers:
+  #   - "auth"
+  #   - "lobby-\\d+"
+
+# ============================================================================
+#  Account history
+#
+#  Remembers which accounts joined from which address, for /proxyshield alts.
+#  Stored in alts.tsv next to this file.
+# ============================================================================
+alts:
+  enabled: true
+
+  # Forget sightings older than this many days. 0 keeps everything.
+  retention-days: 30
 
 lists:
   # How often the feeds are re-downloaded.
@@ -434,6 +522,19 @@ api:
     #   nested-by-ip: false     # true if the answer is keyed by the address
     #   key-header: ""          # set if the key goes in a header, e.g. X-Key
     #   rate-limit-per-minute: 45
+    #   headers:                # extra request headers, {key} and {ip} are filled in
+    #     Authorization: "Bearer {key}"
+    #   conditions:
+    #     # Each named group is a list of "<field> <op> <value>" lines that must ALL
+    #     # hold; any one group matching is enough. Ops: = != > >= < <=.
+    #     # Numbers compare as numbers, everything else as text, ignoring case.
+    #     # Conditions work on every provider, listed ones included, but only on
+    #     # JSON answers. settings.debug shows the raw answer to write them against.
+    #     bypass:               # clears every flag this provider raised
+    #       mobile: ["connection.type = mobile"]
+    #       low-risk: ["risk.score < 20", "security.tor = false"]
+    #     flag:                 # flags the address whatever the fields above say
+    #       high-risk: ["risk.score >= 85"]
     #
     # For a plain text service that just answers "true" or "Y":
     # my-simple-provider:
@@ -669,6 +770,41 @@ discord:
   #   thumbnail: "https://your-server.example/alert.gif"
   #   footer: "ProxyShield {version} on {platform}"
   #   fields: {}
+
+# ============================================================================
+#  Telegram
+#
+#  Sends every block as a chat message through a Telegram bot.
+#    1. Create a bot with @BotFather and paste its token below.
+#    2. Add the bot to your group or channel.
+#    3. chat-id: a group id such as -1001234567890, or @yourchannel for a channel.
+#       The bot's getUpdates page shows the id once somebody has written in the group.
+#  In a forum group, thread-id sends to one topic instead of "General".
+# ============================================================================
+telegram:
+  enabled: false
+  bot-token: ""
+  chat-id: ""
+  thread-id: 0
+  show-ip: true
+  # Placeholders: {player} {ip} {reason} {country} {isp} {asn} {score} {sources}
+  # {action}. \n starts a new line.
+  message: "ProxyShield {action}: {player} ({ip})\n{reason} | {country} | {isp}"
+
+# ============================================================================
+#  VK
+#
+#  Sends every block to a VK conversation through messages.send. Use a community
+#  access token with the "messages" permission. peer-id is the conversation:
+#  2000000000 + chat number for a group chat, or a user id for a direct message.
+# ============================================================================
+vk:
+  enabled: false
+  access-token: ""
+  peer-id: 0
+  api-version: "5.199"
+  show-ip: true
+  message: "ProxyShield {action}: {player} ({ip})\n{reason} | {country} | {isp}"
 
 # ============================================================================
 #  Permissions

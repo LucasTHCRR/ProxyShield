@@ -25,13 +25,16 @@ import com.velocitypowered.api.command.SimpleCommand;
 import com.velocitypowered.api.event.EventTask;
 import com.velocitypowered.api.event.ResultedEvent;
 import com.velocitypowered.api.event.Subscribe;
+import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.connection.LoginEvent;
+import com.velocitypowered.api.event.player.ServerPreConnectEvent;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.Plugin;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
+import com.velocitypowered.api.proxy.server.RegisteredServer;
 import de.lucasthcr.bridgesave.proxyshield.ProxyShieldCore;
 import de.lucasthcr.bridgesave.proxyshield.command.CommandHandler;
 import de.lucasthcr.bridgesave.proxyshield.metrics.MetricsData;
@@ -58,7 +61,7 @@ import org.slf4j.Logger;
 )
 public final class VelocityMain {
 
-   public static final String VERSION = "2.5.1";
+   public static final String VERSION = "3.0.0";
 
    private final ProxyServer server;
    private final Logger logger;
@@ -143,6 +146,40 @@ public final class VelocityMain {
       });
    }
 
+   /**
+    * Keeps a restricted player on the allowed backends. On the first connect there is no server
+    * to fall back to, so the player is redirected to the first allowed one, or disconnected if
+    * none exists.
+    */
+   @Subscribe
+   public void onServerPreConnect(ServerPreConnectEvent event) {
+      Player player = event.getPlayer();
+      RegisteredServer target = event.getResult().getServer().orElse(null);
+      if (target == null || core.mayJoinServer(player.getUniqueId(),
+            target.getServerInfo().getName())) {
+         return;
+      }
+      String name = target.getServerInfo().getName();
+      if (event.getPreviousServer() == null) {
+         for (RegisteredServer candidate : server.getAllServers()) {
+            if (core.mayJoinServer(player.getUniqueId(), candidate.getServerInfo().getName())) {
+               event.setResult(ServerPreConnectEvent.ServerResult.allowed(candidate));
+               return;
+            }
+         }
+         event.setResult(ServerPreConnectEvent.ServerResult.denied());
+         player.disconnect(VelocityPlatform.color(core.restrictedMessage(name)));
+         return;
+      }
+      event.setResult(ServerPreConnectEvent.ServerResult.denied());
+      player.sendMessage(VelocityPlatform.color(core.restrictedMessage(name)));
+   }
+
+   @Subscribe
+   public void onDisconnect(DisconnectEvent event) {
+      core.playerLeft(event.getPlayer().getUniqueId());
+   }
+
    private final class ShieldCommand implements SimpleCommand {
 
       @Override
@@ -170,6 +207,13 @@ public final class VelocityMain {
             @Override
             public boolean hasPermission(String permission) {
                return invocation.source().hasPermission(permission);
+            }
+
+            @Override
+            public String name() {
+               return invocation.source() instanceof Player player
+                     ? player.getUsername()
+                     : "console";
             }
          };
       }

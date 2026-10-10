@@ -153,8 +153,8 @@ public final class Messages {
       m.put("help-stats", "&e/proxyshield stats &8- &7Detection counters");
       m.put("help-check", "&e/proxyshield check <player|ip> &8- &7Run the full pipeline");
       m.put("help-lookup", "&e/proxyshield lookup <ip> &8- &7Fresh provider lookup");
-      m.put("help-whitelist", "&e/proxyshield whitelist <add|remove|list> [ip] &8- &7Never block");
-      m.put("help-blacklist", "&e/proxyshield blacklist <add|remove|list> [ip] &8- &7Always block");
+      m.put("help-whitelist", "&e/proxyshield whitelist <add|remove|info|list|purge> [ip] [time] [reason] &8- &7Never block");
+      m.put("help-blacklist", "&e/proxyshield blacklist <add|remove|info|list|purge> [ip] [time] [reason] &8- &7Always block");
       m.put("help-refresh", "&e/proxyshield refresh &8- &7Re-download the VPN lists");
       m.put("help-recheck", "&e/proxyshield recheck &8- &7Re-check everyone online");
       m.put("help-clearcache", "&e/proxyshield clearcache &8- &7Drop cached lookup results");
@@ -188,6 +188,7 @@ public final class Messages {
       m.put("stats-blocked", "&7Blocked: &c{blocked}{dryrun}");
       m.put("stats-reasons-1", "&7 &8• &7List: &f{list} &8• &7Proxy: &f{proxy} &8• &7Hosting: &f{hosting}");
       m.put("stats-reasons-2", "&7 &8• &7Country: &f{country} &8• &7Blacklist: &f{blacklist} &8• &7Failed: &f{failed}");
+      m.put("stats-reasons-3", "&7 &8• &7Network/ISP: &f{network} &8• &7Account limit: &f{limit} &8• &7Bogon: &f{bogon}");
       m.put("stats-allowed", "&7Allowed by bypass: &f{bypass} &8• &7by whitelist: &f{whitelist}");
       m.put("stats-efficiency", "&7Saved: &f{coalesced} &7shared lookups &8| &7timed out: &f{budget} &8| &7trusted players: &f{trusted}");
       m.put("stats-lookups", "&7Lookups: &f{lookups} &8| &7cache: &f{cachesize}&7, &f{cachehits} &7hits &8| &7limited: &f{limited} &8| &7failed: &f{failed}");
@@ -239,7 +240,7 @@ public final class Messages {
       m.put("list-removed", "{prefix}&aRemoved &f{entry} &afrom the {list}.");
       m.put("list-not-runtime", "{prefix}&c{entry} &7is not an in-game entry. Remove config entries in config.yml.");
       m.put("list-save-failed", "{prefix}&cCould not save the {list}: &f{error}");
-      m.put("list-usage", "{prefix}&cUsage: &f/proxyshield {list} <add|remove|list> [ip]");
+      m.put("list-usage", "{prefix}&cUsage: &f/proxyshield {list} <add|remove|info|list|purge> [ip|player] [30m|12h|7d] [reason]");
 
       m.put("usage-check", "{prefix}&cUsage: &f/proxyshield check <player|ip>");
       m.put("usage-lookup", "{prefix}&cUsage: &f/proxyshield lookup <player|ip>");
@@ -262,6 +263,23 @@ public final class Messages {
       m.put("broadcast-mode", "&abroadcast");
       m.put("fail-open", "&afail-open (allow on error)");
       m.put("fail-closed", "&6fail-closed (deny on error)");
+
+      m.put("help-alts", "&e/proxyshield alts <ip|player> &8- &7Accounts seen on the same address");
+      m.put("list-added-timed", "{prefix}&aAdded &f{entry} &ato the {list}, expires {duration}.");
+      m.put("list-info", "&7{list} &f{entry}&7: reason &f{reason}&7, added by &f{by} &7{added}, expires &f{expires}");
+      m.put("list-info-config", "{prefix}&f{entry} &7comes from config.yml and has no details.");
+      m.put("list-info-missing", "{prefix}&f{entry} &7is not on the {list}.");
+      m.put("list-purged", "{prefix}&aRemoved &f{count} &ain-game entries from the {list}.");
+      m.put("alts-usage", "{prefix}&cUsage: &f/proxyshield alts <ip|player>");
+      m.put("alts-disabled", "{prefix}&7Account history is off (alts.enabled in config.yml).");
+      m.put("alts-none", "{prefix}&7No address on record for &f{target}&7.");
+      m.put("alts-header", "&8&m--------&r &c&lAccounts for {target} &8&m--------");
+      m.put("alts-line", "&f{ip} &8(&f{count}&8)&7: &f{accounts}");
+      m.put("time-in", "in {time}");
+      m.put("time-ago", "{time} ago");
+      m.put("word-unknown", "unknown");
+      m.put("word-never", "never");
+      m.put("restricted-server", "{prefix}&cYou cannot join &f{server} &cfrom this connection.");
 
       // Insertion order is kept so the generated message files stay grouped and readable.
       return Collections.unmodifiableMap(m);

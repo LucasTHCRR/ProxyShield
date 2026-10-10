@@ -19,6 +19,7 @@
 package de.lucasthcr.bridgesave.proxyshield.command;
 
 import de.lucasthcr.bridgesave.proxyshield.ProxyShieldCore;
+import de.lucasthcr.bridgesave.proxyshield.check.AltTracker;
 import de.lucasthcr.bridgesave.proxyshield.check.CheckEngine;
 import de.lucasthcr.bridgesave.proxyshield.check.CheckVerdict;
 import de.lucasthcr.bridgesave.proxyshield.config.ShieldConfig;
@@ -32,11 +33,14 @@ import de.lucasthcr.bridgesave.proxyshield.platform.ShieldPlayer;
 import de.lucasthcr.bridgesave.proxyshield.stats.Statistics;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The {@code /proxyshield} command, implemented once and shared by every platform.
@@ -50,15 +54,24 @@ public final class CommandHandler {
 
    private static final List<String> SUBCOMMANDS = List.of(
          "help", "info", "providers", "reload", "stats", "check", "lookup", "refresh", "recheck",
-         "whitelist", "blacklist", "clearcache", "dryrun", "silent");
+         "whitelist", "blacklist", "alts", "clearcache", "dryrun", "silent");
 
-   private static final List<String> LIST_ACTIONS = List.of("add", "remove", "list");
+   private static final List<String> LIST_ACTIONS =
+         List.of("add", "remove", "list", "info", "purge");
+
+   /** Durations offered when completing {@code whitelist add <entry> }. */
+   private static final List<String> DURATIONS = List.of("30m", "1h", "12h", "1d", "7d", "30d");
 
    /** Whoever ran the command; a player or the console. */
    public interface Sender {
       void send(String legacyMessage);
 
       boolean hasPermission(String permission);
+
+      /** Who is running the command, recorded on list entries they add. */
+      default String name() {
+         return "console";
+      }
    }
 
    private final ProxyShieldCore core;
@@ -112,6 +125,7 @@ public final class CommandHandler {
          case "lookup" -> doLookup(sender, args);
          case "whitelist" -> doListCommand(sender, args, core.whitelist(), "whitelist");
          case "blacklist" -> doListCommand(sender, args, core.blacklist(), "blacklist");
+         case "alts" -> doAlts(sender, args);
          case "dryrun" -> sendToggleHint(sender, "detection.dry-run", core.config().dryRun());
          case "silent" -> sendToggleHint(sender, "notifications.silent", core.config().silent());
          default -> {
@@ -140,7 +154,17 @@ public final class CommandHandler {
       if (args.length == 3 && sub.equals("blacklist") && args[1].equalsIgnoreCase("remove")) {
          return filter(core.blacklist().runtimeEntries(), args[2]);
       }
-      if (args.length == 2 && (sub.equals("check") || sub.equals("lookup"))) {
+      if (args.length == 3 && (sub.equals("whitelist") || sub.equals("blacklist"))
+            && args[1].equalsIgnoreCase("info")) {
+         ManagedIpList list = sub.equals("whitelist") ? core.whitelist() : core.blacklist();
+         return filter(list.runtimeEntries(), args[2]);
+      }
+      if (args.length == 4 && (sub.equals("whitelist") || sub.equals("blacklist"))
+            && args[1].equalsIgnoreCase("add")) {
+         return filter(DURATIONS, args[3]);
+      }
+      if (args.length == 2 && (sub.equals("check") || sub.equals("lookup")
+            || sub.equals("alts"))) {
          List<String> names = new ArrayList<>();
          for (ShieldPlayer online : core.platform().onlinePlayers()) {
             names.add(online.name());
@@ -166,7 +190,7 @@ public final class CommandHandler {
    private void sendHelp(Sender sender) {
       send(sender, "help-header", of("version", core.platform().version()));
       for (String key : List.of("help-info", "help-stats", "help-check", "help-lookup",
-            "help-whitelist", "help-blacklist", "help-refresh", "help-recheck",
+            "help-whitelist", "help-blacklist", "help-alts", "help-refresh", "help-recheck",
             "help-clearcache", "help-reload", "help-footer")) {
          send(sender, key);
       }
@@ -266,6 +290,11 @@ public final class CommandHandler {
             "country", String.valueOf(stats.count(CheckVerdict.Reason.COUNTRY)),
             "blacklist", String.valueOf(stats.count(CheckVerdict.Reason.BLACKLISTED)),
             "failed", String.valueOf(stats.count(CheckVerdict.Reason.LOOKUP_FAILED))));
+      send(sender, "stats-reasons-3", of(
+            "network", String.valueOf(stats.count(CheckVerdict.Reason.ASN)
+                  + stats.count(CheckVerdict.Reason.ISP)),
+            "limit", String.valueOf(stats.count(CheckVerdict.Reason.CONNECTION_LIMIT)),
+            "bogon", String.valueOf(stats.count(CheckVerdict.Reason.BOGON))));
       send(sender, "stats-allowed", of(
             "bypass", String.valueOf(stats.count(CheckVerdict.Reason.BYPASS_PERMISSION)),
             "whitelist", String.valueOf(stats.count(CheckVerdict.Reason.WHITELISTED_IP)
@@ -480,9 +509,16 @@ public final class CommandHandler {
             send(sender, "list-config", of(
                   "count", String.valueOf(fromConfig.size()),
                   "entries", fromConfig.isEmpty() ? empty : String.join(", ", fromConfig)));
+            List<String> described = new ArrayList<>(atRuntime.size());
+            for (String entry : atRuntime) {
+               ManagedIpList.Details details = list.details(entry);
+               described.add(details == null || details.permanent()
+                     ? entry
+                     : entry + " (" + remaining(details.expiresAt()) + ")");
+            }
             send(sender, "list-runtime", of(
                   "count", String.valueOf(atRuntime.size()),
-                  "entries", atRuntime.isEmpty() ? empty : String.join(", ", atRuntime)));
+                  "entries", atRuntime.isEmpty() ? empty : String.join(", ", described)));
             send(sender, "list-ranges", of("count", String.valueOf(list.rangeCount())));
          }
          case "add" -> {
@@ -495,9 +531,28 @@ public final class CommandHandler {
                send(sender, "invalid-entry", of("input", args[2]));
                return;
             }
+            // Optional: a duration, then a free-text reason.
+            long duration = 0L;
+            int reasonFrom = 3;
+            if (args.length > 3) {
+               long parsed = parseDuration(args[3]);
+               if (parsed > 0L) {
+                  duration = parsed;
+                  reasonFrom = 4;
+               } else if (args[3].equalsIgnoreCase("perm")
+                     || args[3].equalsIgnoreCase("permanent")) {
+                  reasonFrom = 4;
+               }
+            }
+            String reason = args.length > reasonFrom
+                  ? String.join(" ", Arrays.copyOfRange(args, reasonFrom, args.length))
+                  : null;
             try {
-               send(sender, list.add(entry) ? "list-added" : "list-already",
-                     of("entry", entry, "list", label));
+               boolean added = list.add(entry, reason, sender.name(), duration);
+               send(sender, added ? (duration > 0L ? "list-added-timed" : "list-added")
+                     : "list-already",
+                     of("entry", entry, "list", label, "duration", remaining(
+                           System.currentTimeMillis() + duration)));
             } catch (IOException failure) {
                send(sender, "list-save-failed",
                      of("list", label, "error", String.valueOf(failure.getMessage())));
@@ -517,8 +572,131 @@ public final class CommandHandler {
                      of("list", label, "error", String.valueOf(failure.getMessage())));
             }
          }
+         case "info" -> {
+            if (args.length < 3) {
+               send(sender, "list-usage", of("list", label));
+               return;
+            }
+            String entry = resolveEntry(args[2]);
+            ManagedIpList.Details details = list.details(entry);
+            if (details == null) {
+               send(sender, list.contains(entry, true) ? "list-info-config" : "list-info-missing",
+                     of("entry", entry, "list", label));
+               return;
+            }
+            String unknown = messages().get("word-unknown");
+            send(sender, "list-info", of(
+                  "entry", entry,
+                  "list", label,
+                  "reason", details.reason() == null ? unknown : details.reason(),
+                  "by", details.addedBy() == null ? unknown : details.addedBy(),
+                  "added", details.addedAt() > 0L ? ago(details.addedAt()) : unknown,
+                  "expires", details.permanent() ? messages().get("word-never")
+                        : remaining(details.expiresAt())));
+         }
+         case "purge" -> {
+            try {
+               send(sender, "list-purged", of("count", String.valueOf(list.purge()),
+                     "list", label));
+            } catch (IOException failure) {
+               send(sender, "list-save-failed",
+                     of("list", label, "error", String.valueOf(failure.getMessage())));
+            }
+         }
          default -> send(sender, "list-usage", of("list", label));
       }
+   }
+
+   private void doAlts(Sender sender, String[] args) {
+      if (args.length < 2) {
+         send(sender, "alts-usage");
+         return;
+      }
+      if (!core.config().altsEnabled()) {
+         send(sender, "alts-disabled");
+         return;
+      }
+      String target = args[1];
+      core.platform().runAsync(() -> {
+         Set<String> addresses = new LinkedHashSet<>();
+         if (IpAddresses.isValid(target)) {
+            addresses.add(target);
+         } else {
+            core.platform().player(target).map(ShieldPlayer::ip).ifPresent(addresses::add);
+            addresses.addAll(core.alts().addressesOf(target));
+         }
+         if (addresses.isEmpty()) {
+            send(sender, "alts-none", of("target", target));
+            return;
+         }
+         send(sender, "alts-header", of("target", target));
+         for (String address : addresses) {
+            List<AltTracker.Sighting> accounts = core.alts().accountsOn(address);
+            List<String> names = new ArrayList<>(accounts.size());
+            for (AltTracker.Sighting sighting : accounts) {
+               names.add(sighting.name() + " (" + ago(sighting.lastSeen()) + ")");
+            }
+            send(sender, "alts-line", of(
+                  "ip", address,
+                  "count", String.valueOf(accounts.size()),
+                  "accounts", names.isEmpty() ? messages().get("list-empty")
+                        : String.join(", ", names)));
+         }
+      });
+   }
+
+   /**
+    * Reads {@code 30m}, {@code 12h}, {@code 7d}, {@code 2w} or {@code 90s}.
+    *
+    * @return the duration in milliseconds, or 0 if the text is not a duration
+    */
+   static long parseDuration(String raw) {
+      if (raw == null || raw.length() < 2) {
+         return 0L;
+      }
+      String text = raw.trim().toLowerCase(Locale.ROOT);
+      char unit = text.charAt(text.length() - 1);
+      long factor = switch (unit) {
+         case 's' -> 1_000L;
+         case 'm' -> 60_000L;
+         case 'h' -> 3_600_000L;
+         case 'd' -> 86_400_000L;
+         case 'w' -> 604_800_000L;
+         default -> 0L;
+      };
+      if (factor == 0L) {
+         return 0L;
+      }
+      try {
+         long amount = Long.parseLong(text.substring(0, text.length() - 1));
+         return amount > 0L && amount < 100_000L ? amount * factor : 0L;
+      } catch (NumberFormatException notADuration) {
+         return 0L;
+      }
+   }
+
+   /** "in 2h 5m" style text for a moment in the future. */
+   private String remaining(long at) {
+      return messages().get("time-in", of("time", span(at - System.currentTimeMillis())));
+   }
+
+   /** "3d ago" style text for a moment in the past. */
+   private String ago(long at) {
+      return messages().get("time-ago", of("time", span(System.currentTimeMillis() - at)));
+   }
+
+   private static String span(long millis) {
+      long minutes = Math.max(0L, millis) / 60_000L;
+      if (minutes < 1L) {
+         return "<1m";
+      }
+      long days = minutes / 1440L;
+      long hours = minutes % 1440L / 60L;
+      long rest = minutes % 60L;
+      if (days > 0L) {
+         return hours > 0L ? days + "d " + hours + "h" : days + "d";
+      }
+      return hours > 0L ? hours + "h " + rest + "m" : rest + "m";
    }
 
    private void sendToggleHint(Sender sender, String key, boolean enabled) {

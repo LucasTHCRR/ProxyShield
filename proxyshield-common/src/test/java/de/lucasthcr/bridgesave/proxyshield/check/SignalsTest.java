@@ -77,6 +77,8 @@ class SignalsTest {
       values.put("detection.rdns.enabled", false);
       values.put("heuristics.enabled", false);
       values.put("trust.enabled", false);
+      // The fixtures use documentation ranges (RFC 5737), which the bogon rule would refuse.
+      values.put("detection.block-bogon", false);
       return values;
    }
 

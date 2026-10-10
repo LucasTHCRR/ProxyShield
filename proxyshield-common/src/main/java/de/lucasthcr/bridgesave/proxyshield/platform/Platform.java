@@ -55,6 +55,14 @@ public interface Platform {
     */
    ConfigNode loadYaml(String fileName);
 
+   /**
+    * Whether this is a proxy (BungeeCord, Velocity) that routes players to backend servers.
+    * Restricted-server mode only exists there.
+    */
+   default boolean proxy() {
+      return false;
+   }
+
    /** Writes the bundled default config.yml if none exists yet. */
    default void saveDefaultConfig() {
       saveResource("config.yml");

@@ -67,12 +67,18 @@ address.
 - Consensus scoring: several providers are asked at once and their weights added up, so one service
   that has never heard of a VPN cannot clear it, and one noisy service cannot kick anybody alone
 - Public VPN, datacenter and Tor exit feeds with correct CIDR matching, IPv4 and IPv6
-- Network (ASN) block and allow rules, which catch a VPN's new range before any feed lists it
+- Network (ASN) block and allow rules, which catch a VPN's new range before any feed lists it,
+  plus downloadable ASN lists that refresh on their own
+- ISP filter with regular expressions, to block a hoster or always admit a mobile carrier
+- Conditions on any provider's answer (`risk.score >= 85`, `connection.type = mobile`) and
+  custom request headers, so an unlisted service can be wired in exactly
+- Bogon addresses refused outright
 - Reverse DNS patterns as a signal - free, unlimited, and effective on ranges nobody has catalogued
 - Behavioural heuristics: join rate per subnet, accounts per address, an account changing country
 - Trust for regulars, so a tightened rule or a provider having a bad day does not kick your players
 - Country filtering, blacklist or whitelist mode
 - Manual blacklist, checked before everything else
+- Connection limit per address, by players online or within a time window
 - Configurable fail-open or fail-closed behaviour when a check cannot complete
 
 **Exemptions**
@@ -86,6 +92,12 @@ address.
 **Operations**
 
 - Dry-run mode: detect and report without disconnecting anybody
+- Passive mode: no checks at login, lookups on demand only
+- Restricted servers on BungeeCord and Velocity: keep a flagged player in the lobby instead of
+  disconnecting them
+- Whitelist and blacklist entries with a reason and an expiry
+- `/proxyshield alts` lists every account seen on the same address
+- Debug output with every provider's raw answer
 - Console commands on a detection, so a flagged player can be marked or restricted instead of kicked
 - `/proxyshield check` shows what every single provider said, so a false positive can be traced
 - Lookup cache survives restarts and reloads; simultaneous logins from one address share one query
@@ -93,6 +105,7 @@ address.
 - PlaceholderAPI support and anonymous bStats metrics
 - Silent mode: no staff or console alerts, while the log file and webhook keep recording
 - Discord webhook with queueing, retry and rate-limit handling, and a layout you write yourself
+- Telegram and VK alerts
 - Block log at `plugins/ProxyShield/blocks.log`
 - Full `/proxyshield` command set with tab completion
 - English and German out of the box, any language by copying one file
@@ -311,8 +324,9 @@ All of these need `proxyshield.admin`. Aliases: `/ps`, `/antivpn`.
 | `/proxyshield stats` | Detection counters, cache and webhook state |
 | `/proxyshield check <player\|ip>` | Runs the full pipeline and explains the verdict |
 | `/proxyshield lookup <player\|ip>` | Fresh provider lookup, ignoring the cache |
-| `/proxyshield whitelist <add\|remove\|list> [entry]` | Manage the never-block list |
-| `/proxyshield blacklist <add\|remove\|list> [entry]` | Manage the always-block list |
+| `/proxyshield whitelist <add\|remove\|info\|list\|purge> [entry] [time] [reason]` | Manage the never-block list |
+| `/proxyshield blacklist <add\|remove\|info\|list\|purge> [entry] [time] [reason]` | Manage the always-block list |
+| `/proxyshield alts <player\|ip>` | Every account seen on the same address |
 | `/proxyshield refresh` | Re-download the feeds |
 | `/proxyshield recheck` | Re-check everyone online, disconnect whoever fails |
 | `/proxyshield clearcache` | Drop cached lookup results |
@@ -351,13 +365,16 @@ anything that can block one, so an operator can always whitelist their way out o
 | 3 | IP in `whitelist.ips` | allow | none |
 | 4 | Bedrock player via Floodgate | allow | none |
 | 5 | Loopback or private address | allow | none |
-| 5 | IP in `blacklist.ips` | **block** | none |
-| 7 | IP in a downloaded feed | **block** | ~0.6 µs |
-| 8 | Provider reports `proxy` | **block** | one HTTP request per uncached IP |
-| 9 | Provider reports `hosting` | **block** | same request |
-| 10 | Country not permitted | **block** | same request |
+| 6 | Bogon address | **block** | none |
+| 7 | IP in `blacklist.ips` | **block** | none |
+| 8 | IP in a downloaded feed | **block** | ~0.6 µs |
+| 9 | Network (ASN) or ISP rule | allow or **block** | one HTTP request per uncached IP |
+| 10 | Provider reports `proxy` | **block** | same request |
+| 11 | Provider reports `hosting` | **block** | same request |
+| 12 | Country not permitted | **block** | same request |
+| 13 | Over the connection limit | **block** | none |
 
-Steps 1 to 7 never touch the network. Step 7 onwards costs one provider request per address that is
+Steps 1 to 8 never touch the network. Step 9 onwards costs one provider request per address that is
 not in the cache, which is why the cache TTL matters more than the rate limit on most servers.
 
 ### Performance

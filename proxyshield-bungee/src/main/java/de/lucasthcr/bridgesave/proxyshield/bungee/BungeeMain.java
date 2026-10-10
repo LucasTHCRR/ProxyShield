@@ -27,9 +27,12 @@ import java.net.SocketAddress;
 import net.md_5.bungee.api.CommandSender;
 import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.connection.PendingConnection;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.event.LoginEvent;
+import net.md_5.bungee.api.event.PlayerDisconnectEvent;
+import net.md_5.bungee.api.event.ServerConnectEvent;
 import net.md_5.bungee.api.plugin.Command;
 import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.api.plugin.Plugin;
@@ -122,6 +125,41 @@ public final class BungeeMain extends Plugin implements Listener {
       });
    }
 
+   /**
+    * Keeps a restricted player on the allowed backends. On the first connect there is no server
+    * to fall back to, so the player is redirected to the first allowed one, or disconnected if
+    * none exists.
+    */
+   @EventHandler(priority = EventPriority.HIGH)
+   public void onServerConnect(ServerConnectEvent event) {
+      ProxiedPlayer player = event.getPlayer();
+      ServerInfo target = event.getTarget();
+      if (event.isCancelled() || target == null
+            || core.mayJoinServer(player.getUniqueId(), target.getName())) {
+         return;
+      }
+      if (player.getServer() == null) {
+         for (ServerInfo candidate : getProxy().getServers().values()) {
+            if (core.mayJoinServer(player.getUniqueId(), candidate.getName())) {
+               event.setTarget(candidate);
+               return;
+            }
+         }
+         player.disconnect(TextComponent.fromLegacyText(
+               BungeePlatform.color(core.restrictedMessage(target.getName()))));
+         event.setCancelled(true);
+         return;
+      }
+      event.setCancelled(true);
+      player.sendMessage(TextComponent.fromLegacyText(
+            BungeePlatform.color(core.restrictedMessage(target.getName()))));
+   }
+
+   @EventHandler
+   public void onDisconnect(PlayerDisconnectEvent event) {
+      core.playerLeft(event.getPlayer().getUniqueId());
+   }
+
    private String addressOf(PendingConnection connection) {
       SocketAddress address = connection.getSocketAddress();
       if (address instanceof InetSocketAddress inet && inet.getAddress() != null) {
@@ -169,6 +207,11 @@ public final class BungeeMain extends Plugin implements Listener {
             @Override
             public boolean hasPermission(String permission) {
                return sender.hasPermission(permission);
+            }
+
+            @Override
+            public String name() {
+               return sender.getName();
             }
          };
       }

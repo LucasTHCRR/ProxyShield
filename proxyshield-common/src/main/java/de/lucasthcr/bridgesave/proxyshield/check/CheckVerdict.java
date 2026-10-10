@@ -32,6 +32,8 @@ public record CheckVerdict(Reason reason, String detail, LookupResult lookup) {
       BEDROCK_PLAYER("Bedrock player", false),
       TRUSTED_PLAYER("trusted player", false),
       ALLOWED_ASN("allowed network", false),
+      ALLOWED_ISP("allowed ISP", false),
+      PASSIVE("passive mode", false),
 
       BLACKLISTED("blacklisted IP", true),
       IP_LIST("VPN list", true),
@@ -39,6 +41,9 @@ public record CheckVerdict(Reason reason, String detail, LookupResult lookup) {
       HOSTING("hosting/datacenter", true),
       TOR("Tor exit node", true),
       ASN("blocked network", true),
+      ISP("blocked ISP", true),
+      BOGON("bogon address", true),
+      CONNECTION_LIMIT("too many accounts from this address", true),
       SUSPICIOUS("suspicious connection", true),
       COUNTRY("country block", true),
       LOOKUP_FAILED("lookup failed", true);

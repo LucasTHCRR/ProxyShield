@@ -18,7 +18,9 @@
 
 package de.lucasthcr.bridgesave.proxyshield.lookup;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 
@@ -78,6 +80,10 @@ public final class ProviderDefinition {
    private final String key;
    private final String contact;
 
+   private final Map<String, String> headers;
+   private final List<ResponseRule> bypassRules;
+   private final List<ResponseRule> flagRules;
+
    private ProviderDefinition(Builder builder) {
       this.id = builder.id;
       this.urlTemplate = builder.urlTemplate;
@@ -103,6 +109,9 @@ public final class ProviderDefinition {
       this.nestedByIp = builder.nestedByIp;
       this.key = builder.key;
       this.contact = builder.contact;
+      this.headers = Map.copyOf(builder.headers);
+      this.bypassRules = List.copyOf(builder.bypassRules);
+      this.flagRules = List.copyOf(builder.flagRules);
    }
 
    public static Builder builder(String id, String urlTemplate) {
@@ -182,6 +191,43 @@ public final class ProviderDefinition {
    /** A copy of this definition with the operator's weight applied. */
    public ProviderDefinition withWeight(double weight) {
       return toBuilder().weight(weight).build();
+   }
+
+   /**
+    * A copy carrying extra request headers and the operator's response rules. Header values may
+    * use {@code {key}} and {@code {ip}}.
+    */
+   public ProviderDefinition withExtras(Map<String, String> headers,
+         List<ResponseRule> bypassRules, List<ResponseRule> flagRules) {
+      Builder builder = toBuilder();
+      builder.headers = new LinkedHashMap<>(headers);
+      builder.bypassRules = List.copyOf(bypassRules);
+      builder.flagRules = List.copyOf(flagRules);
+      return builder.build();
+   }
+
+   /** Request headers with {@code {key}} and {@code {ip}} filled in. */
+   public Map<String, String> headers(String ip) {
+      if (headers.isEmpty()) {
+         return headers;
+      }
+      Map<String, String> resolved = new LinkedHashMap<>();
+      for (Map.Entry<String, String> header : headers.entrySet()) {
+         resolved.put(header.getKey(), header.getValue()
+               .replace("{key}", key == null ? "" : key)
+               .replace("{ip}", ip));
+      }
+      return resolved;
+   }
+
+   /** Rules that clear an answer whatever its flags say. Checked before {@link #flagRules()}. */
+   public List<ResponseRule> bypassRules() {
+      return bypassRules;
+   }
+
+   /** Rules that flag an answer whatever its flags say. */
+   public List<ResponseRule> flagRules() {
+      return flagRules;
    }
 
    public ProviderDefinition withRateLimit(int rateLimitPerMinute) {
@@ -339,6 +385,9 @@ public final class ProviderDefinition {
       builder.nestedByIp = nestedByIp;
       builder.key = key;
       builder.contact = contact;
+      builder.headers = new LinkedHashMap<>(headers);
+      builder.bypassRules = List.copyOf(bypassRules);
+      builder.flagRules = List.copyOf(flagRules);
       return builder;
    }
 
@@ -378,6 +427,10 @@ public final class ProviderDefinition {
 
       private String key;
       private String contact;
+
+      private Map<String, String> headers = Map.of();
+      private List<ResponseRule> bypassRules = List.of();
+      private List<ResponseRule> flagRules = List.of();
 
       private Builder(String id, String urlTemplate) {
          this.id = id.toLowerCase(Locale.ROOT);

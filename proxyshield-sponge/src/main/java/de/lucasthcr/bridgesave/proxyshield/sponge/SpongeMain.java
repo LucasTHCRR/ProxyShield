@@ -40,6 +40,7 @@ import org.spongepowered.api.command.CommandCompletion;
 import org.spongepowered.api.command.CommandResult;
 import org.spongepowered.api.command.parameter.ArgumentReader;
 import org.spongepowered.api.config.ConfigDir;
+import org.spongepowered.api.entity.living.player.server.ServerPlayer;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.Order;
 import org.spongepowered.api.event.lifecycle.ConstructPluginEvent;
@@ -205,6 +206,11 @@ public final class SpongeMain {
             @Override
             public boolean hasPermission(String permission) {
                return cause.hasPermission(permission);
+            }
+
+            @Override
+            public String name() {
+               return cause.root() instanceof ServerPlayer player ? player.name() : "console";
             }
          };
       }

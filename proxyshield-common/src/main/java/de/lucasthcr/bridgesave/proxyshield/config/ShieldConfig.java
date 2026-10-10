@@ -21,11 +21,16 @@ package de.lucasthcr.bridgesave.proxyshield.config;
 import de.lucasthcr.bridgesave.proxyshield.lookup.ProviderCatalog;
 import de.lucasthcr.bridgesave.proxyshield.notify.EmbedTemplate;
 import de.lucasthcr.bridgesave.proxyshield.lookup.ProviderDefinition;
+import de.lucasthcr.bridgesave.proxyshield.lookup.ResponseRule;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /** Typed, immutable snapshot of config.yml. Reloading builds a new instance and swaps it in. */
 public final class ShieldConfig {
@@ -82,6 +87,10 @@ public final class ShieldConfig {
       }
    }
 
+   /** Plain text alert for Telegram and VK. A literal backslash-n becomes a line break. */
+   static final String DEFAULT_CHAT_MESSAGE =
+         "ProxyShield {action}: {player} ({ip})\\n{reason} | {country} | {isp}";
+
    // settings
    private final String language;
    private final boolean failClosed;
@@ -134,10 +143,30 @@ public final class ShieldConfig {
    private final boolean asnEnabled;
    private final Set<String> blockedAsns;
    private final Set<String> allowedAsns;
+   private final List<String> asnSources;
    private final boolean rdnsEnabled;
    private final List<String> rdnsPatterns;
    private final double rdnsWeight;
    private final int rdnsTimeoutMillis;
+   private final boolean blockBogon;
+   private final boolean passive;
+   private final List<Pattern> blockedIsps;
+   private final List<Pattern> allowedIsps;
+   private final boolean debug;
+
+   // limiter
+   private final boolean limiterEnabled;
+   private final int limiterMax;
+   private final int limiterWindowMinutes;
+
+   // restricted servers
+   private final boolean restrictedEnabled;
+   private final boolean restrictedWhitelist;
+   private final List<Pattern> restrictedServers;
+
+   // alts
+   private final boolean altsEnabled;
+   private final int altsRetentionDays;
 
    // trust
    private final boolean trustEnabled;
@@ -195,7 +224,25 @@ public final class ShieldConfig {
    private final int discordColor;
    private final EmbedTemplate discordEmbed;
 
+   // telegram / vk
+   private final boolean telegramEnabled;
+   private final String telegramToken;
+   private final String telegramChatId;
+   private final long telegramThreadId;
+   private final boolean telegramShowIp;
+   private final String telegramMessage;
+   private final boolean vkEnabled;
+   private final String vkToken;
+   private final long vkPeerId;
+   private final String vkApiVersion;
+   private final boolean vkShowIp;
+   private final String vkMessage;
+
+   /** Problems found while reading, reported once by the caller. */
+   private final List<String> warnings;
+
    private ShieldConfig(ConfigNode node) {
+      List<String> configWarnings = new ArrayList<>();
       this.language = node.getString("settings.language", "en");
       this.failClosed = node.getBoolean("settings.fail-closed", false);
       this.bypassPermission = node.getString("settings.bypass-permission", "proxyshield.bypass");
@@ -237,7 +284,7 @@ public final class ShieldConfig {
       this.apiMaxCacheEntries = clamp(node.getInt("api.max-cache-entries", 10000), 100, 1000000);
       this.apiRateLimitPerMinute = clamp(node.getInt("api.rate-limit-per-minute", 45), 1, 10000);
       this.apiPersistCache = node.getBoolean("api.persist-cache", true);
-      this.providers = readProviders(node);
+      this.providers = readProviders(node, configWarnings);
 
       this.blockTor = node.getBoolean("detection.block-tor", true);
       this.allowResidentialHosting =
@@ -245,10 +292,28 @@ public final class ShieldConfig {
       this.asnEnabled = node.getBoolean("detection.asn.enabled", true);
       this.blockedAsns = normalizedAsns(node.getStringList("detection.asn.blocked"));
       this.allowedAsns = normalizedAsns(node.getStringList("detection.asn.allowed"));
+      this.asnSources = List.copyOf(node.getStringList("detection.asn.sources"));
       this.rdnsEnabled = node.getBoolean("detection.rdns.enabled", true);
       this.rdnsPatterns = lowerCaseList(node.getStringList("detection.rdns.patterns"));
       this.rdnsWeight = Math.max(0.0, node.getDouble("detection.rdns.weight", 1.0));
       this.rdnsTimeoutMillis = clamp(node.getInt("detection.rdns.timeout-millis", 700), 50, 5000);
+      this.blockBogon = node.getBoolean("detection.block-bogon", true);
+      this.passive = node.getBoolean("detection.passive", false);
+      this.blockedIsps = ispPatterns(node.getStringList("detection.isp.blocked"));
+      this.allowedIsps = ispPatterns(node.getStringList("detection.isp.allowed"));
+      this.debug = node.getBoolean("settings.debug", false);
+
+      this.limiterEnabled = node.getBoolean("limiter.enabled", false);
+      this.limiterMax = clamp(node.getInt("limiter.max-per-ip", 3), 1, 1000);
+      this.limiterWindowMinutes = parseWindowMinutes(node.getString("limiter.window", "disable"));
+
+      this.restrictedEnabled = node.getBoolean("restricted.enabled", false);
+      this.restrictedWhitelist =
+            !"blacklist".equalsIgnoreCase(node.getString("restricted.mode", "whitelist"));
+      this.restrictedServers = serverPatterns(node.getStringList("restricted.servers"));
+
+      this.altsEnabled = node.getBoolean("alts.enabled", true);
+      this.altsRetentionDays = clamp(node.getInt("alts.retention-days", 30), 0, 3650);
 
       this.trustEnabled = node.getBoolean("trust.enabled", true);
       this.trustMinLogins = clamp(node.getInt("trust.min-logins", 5), 1, 10000);
@@ -303,6 +368,24 @@ public final class ShieldConfig {
       this.discordTitle = node.getString("discord.title", "ProxyShield Alert");
       this.discordColor = node.getInt("discord.color", 0xFF0000);
       this.discordEmbed = EmbedTemplate.from(node, this.discordTitle);
+
+      this.telegramEnabled = node.getBoolean("telegram.enabled", false);
+      this.telegramToken = node.getString("telegram.bot-token", "").trim();
+      this.telegramChatId = node.getString("telegram.chat-id", "").trim();
+      this.telegramThreadId = Math.max(0L, node.getLong("telegram.thread-id", 0L));
+      this.telegramShowIp = node.getBoolean("telegram.show-ip", true);
+      this.telegramMessage = node.getString("telegram.message", DEFAULT_CHAT_MESSAGE);
+      this.vkEnabled = node.getBoolean("vk.enabled", false);
+      this.vkToken = node.getString("vk.access-token", "").trim();
+      this.vkPeerId = node.getLong("vk.peer-id", 0L);
+      this.vkApiVersion = node.getString("vk.api-version", "5.199").trim();
+      this.vkShowIp = node.getBoolean("vk.show-ip", true);
+      this.vkMessage = node.getString("vk.message", DEFAULT_CHAT_MESSAGE);
+      this.warnings = List.copyOf(configWarnings);
+   }
+
+   public List<String> warnings() {
+      return warnings;
    }
 
    public static ShieldConfig from(ConfigNode node) {
@@ -317,7 +400,8 @@ public final class ShieldConfig {
     * own response layout, so enabling one is a single line, while an unknown id with a {@code url}
     * describes a service the catalog has never heard of without touching code.
     */
-   private static List<ProviderDefinition> readProviders(ConfigNode node) {
+   private static List<ProviderDefinition> readProviders(ConfigNode node,
+         List<String> warnings) {
       List<ProviderDefinition> out = new ArrayList<>();
 
       for (String id : node.getKeys("api.providers")) {
@@ -344,6 +428,9 @@ public final class ShieldConfig {
                .withWeight(node.getDouble(base + ".weight", definition.weight()))
                .withRateLimit(node.getInt(base + ".rate-limit-per-minute",
                      definition.rateLimitPerMinute()));
+         definition = definition.withExtras(readHeaders(node, base + ".headers"),
+               readRules(node, base + ".conditions.bypass", warnings),
+               readRules(node, base + ".conditions.flag", warnings));
          out.add(definition);
       }
 
@@ -362,6 +449,43 @@ public final class ShieldConfig {
       }
 
       return List.copyOf(out);
+   }
+
+   private static Map<String, String> readHeaders(ConfigNode node, String path) {
+      Map<String, String> headers = new LinkedHashMap<>();
+      for (String name : node.getKeys(path)) {
+         String value = node.getString(path + "." + name, null);
+         if (value != null && !name.isBlank()) {
+            headers.put(name.trim(), value);
+         }
+      }
+      return headers;
+   }
+
+   /**
+    * Reads a block of named rule groups. Each key holds a list of conditions that must all hold;
+    * any one group matching is enough. A group that cannot be parsed is skipped and reported
+    * through {@link #warnings()}: refusing the whole config would leave the server unprotected
+    * over one typo.
+    */
+   private static List<ResponseRule> readRules(ConfigNode node, String path,
+         List<String> warnings) {
+      List<ResponseRule> rules = new ArrayList<>();
+      for (String name : node.getKeys(path)) {
+         List<String> lines = node.getStringList(path + "." + name);
+         if (lines.isEmpty()) {
+            String single = node.getString(path + "." + name, null);
+            if (single != null && !single.isBlank()) {
+               lines = List.of(single);
+            }
+         }
+         try {
+            rules.add(ResponseRule.parse(name, lines));
+         } catch (IllegalArgumentException invalid) {
+            warnings.add("Ignoring " + path + "." + name + ": " + invalid.getMessage());
+         }
+      }
+      return rules;
    }
 
    /** Builds a definition for a service described entirely in config.yml. */
@@ -425,6 +549,66 @@ public final class ShieldConfig {
          }
       }
       return Set.copyOf(out);
+   }
+
+   /**
+    * Compiles the ISP filter entries case-insensitively. An entry that is not a valid regular
+    * expression is matched literally instead of being dropped, so "AT&T (Mobility)" still works.
+    */
+   /**
+    * Reads a window such as {@code 30m}, {@code 2h} or a bare number of minutes. Anything else,
+    * {@code disable} included, means no window.
+    */
+   static int parseWindowMinutes(String raw) {
+      if (raw == null) {
+         return 0;
+      }
+      String value = raw.trim().toLowerCase(Locale.ROOT);
+      int factor = 1;
+      if (value.endsWith("h")) {
+         factor = 60;
+         value = value.substring(0, value.length() - 1);
+      } else if (value.endsWith("m")) {
+         value = value.substring(0, value.length() - 1);
+      }
+      try {
+         return clamp(Integer.parseInt(value.trim()) * factor, 0, 7 * 24 * 60);
+      } catch (NumberFormatException notANumber) {
+         return 0;
+      }
+   }
+
+   /** Backend names match as a whole, case-insensitively, so "lobby" does not also hit "lobby-dev". */
+   private static List<Pattern> serverPatterns(List<String> values) {
+      List<Pattern> out = new ArrayList<>(values.size());
+      for (String value : values) {
+         if (value == null || value.isBlank()) {
+            continue;
+         }
+         String trimmed = value.trim();
+         try {
+            out.add(Pattern.compile(trimmed, Pattern.CASE_INSENSITIVE));
+         } catch (PatternSyntaxException notARegex) {
+            out.add(Pattern.compile(Pattern.quote(trimmed), Pattern.CASE_INSENSITIVE));
+         }
+      }
+      return List.copyOf(out);
+   }
+
+   private static List<Pattern> ispPatterns(List<String> values) {
+      List<Pattern> out = new ArrayList<>(values.size());
+      for (String value : values) {
+         if (value == null || value.isBlank()) {
+            continue;
+         }
+         String trimmed = value.trim();
+         try {
+            out.add(Pattern.compile(trimmed, Pattern.CASE_INSENSITIVE));
+         } catch (PatternSyntaxException notARegex) {
+            out.add(Pattern.compile(Pattern.quote(trimmed), Pattern.CASE_INSENSITIVE));
+         }
+      }
+      return List.copyOf(out);
    }
 
    private static List<String> lowerCaseList(List<String> values) {
@@ -493,6 +677,55 @@ public final class ShieldConfig {
          }
       }
       return out;
+   }
+
+   public boolean telegramUsable() {
+      return telegramEnabled && !telegramToken.isEmpty() && !telegramChatId.isEmpty();
+   }
+
+   public String telegramToken() {
+      return telegramToken;
+   }
+
+   public String telegramChatId() {
+      return telegramChatId;
+   }
+
+   /** Topic inside a forum supergroup, 0 for the main chat. */
+   public long telegramThreadId() {
+      return telegramThreadId;
+   }
+
+   public boolean telegramShowIp() {
+      return telegramShowIp;
+   }
+
+   public String telegramMessage() {
+      return telegramMessage;
+   }
+
+   public boolean vkUsable() {
+      return vkEnabled && !vkToken.isEmpty() && vkPeerId != 0L;
+   }
+
+   public String vkToken() {
+      return vkToken;
+   }
+
+   public long vkPeerId() {
+      return vkPeerId;
+   }
+
+   public String vkApiVersion() {
+      return vkApiVersion;
+   }
+
+   public boolean vkShowIp() {
+      return vkShowIp;
+   }
+
+   public String vkMessage() {
+      return vkMessage;
    }
 
    public boolean discordUsable() {
@@ -686,6 +919,75 @@ public final class ShieldConfig {
 
    public int rdnsTimeoutMillis() {
       return rdnsTimeoutMillis;
+   }
+
+   /**
+    * Whether a detected player on a proxy is kept on the allowed backends instead of being
+    * disconnected. Off, or with no servers listed, the player is disconnected as usual.
+    */
+   public boolean restrictedEnabled() {
+      return restrictedEnabled && !restrictedServers.isEmpty();
+   }
+
+   /** Whether a restricted player may be sent to the named backend. */
+   public boolean restrictedAllows(String server) {
+      boolean listed = false;
+      for (Pattern pattern : restrictedServers) {
+         if (pattern.matcher(server).matches()) {
+            listed = true;
+            break;
+         }
+      }
+      return restrictedWhitelist == listed;
+   }
+
+   /** Whether accounts are remembered per address for {@code /proxyshield alts}. */
+   public boolean altsEnabled() {
+      return altsEnabled;
+   }
+
+   public int altsRetentionDays() {
+      return altsRetentionDays;
+   }
+
+   public boolean limiterEnabled() {
+      return limiterEnabled;
+   }
+
+   public int limiterMax() {
+      return limiterMax;
+   }
+
+   /** 0 means "count players online right now" rather than admissions inside a window. */
+   public int limiterWindowMinutes() {
+      return limiterWindowMinutes;
+   }
+
+   /** URLs of downloadable ASN block lists, refreshed with the address lists. */
+   public List<String> asnSources() {
+      return asnSources;
+   }
+
+   public boolean blockBogon() {
+      return blockBogon;
+   }
+
+   /** Joins are not checked; only {@code /proxyshield check} and the API look at addresses. */
+   public boolean passive() {
+      return passive;
+   }
+
+   public List<Pattern> blockedIsps() {
+      return blockedIsps;
+   }
+
+   public List<Pattern> allowedIsps() {
+      return allowedIsps;
+   }
+
+   /** Logs every provider response, for working out why an address was or was not flagged. */
+   public boolean debug() {
+      return debug;
    }
 
    public boolean trustEnabled() {

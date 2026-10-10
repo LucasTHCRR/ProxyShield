@@ -1,5 +1,84 @@
 # Changelog
 
+## 3.0.0
+
+### Added
+
+- **Rules on provider answers.** Every provider, listed or your own, takes a `conditions` block
+  with named groups of `<field> <op> <value>` lines. A `bypass` group that matches clears every
+  flag the provider raised, a `flag` group raises one the field mapping did not. Lines inside a
+  group must all hold, any one group is enough. Numbers compare as numbers, text ignoring case,
+  and a field missing from the answer never satisfies a line. An unreadable line is skipped with
+  a warning at start-up instead of taking the whole config down.
+
+- **Request headers per provider.** `headers:` adds any header to a provider's request, with
+  `{key}` and `{ip}` filled in, for services that want `Authorization: Bearer ...` or similar.
+
+- **`settings.debug`** prints every provider answer, raw body included, next to what was read
+  from it. That is what you write conditions against.
+
+- **ISP filter.** `detection.isp.blocked` and `detection.isp.allowed` take case-insensitive
+  regular expressions matched against the provider's ISP name. An allowed ISP outranks the proxy
+  and hosting flags, which makes it the place for a mobile carrier that keeps getting flagged.
+
+- **Downloadable ASN lists.** `detection.asn.sources` takes https URLs serving a JSON array or
+  plain text with one network per line. They refresh with the address feeds, and the last good
+  download is kept in `asn-cache.txt`.
+
+- **Bogon addresses are refused.** Documentation, benchmark, multicast and reserved ranges cannot
+  belong to a real player; one of them at login means a forwarding layer was given a false
+  address. Private and Tailscale ranges are not affected. `detection.block-bogon: false` turns it
+  off.
+
+- **Connection limit.** `limiter` caps accounts per address as a hard rule, either counting who is
+  online right now or counting admissions inside a window such as `30m`, which resets on its own.
+  Whitelisted, local and bypassing players never count. Off by default.
+
+- **Restricted servers** on BungeeCord and Velocity. With `restricted.enabled`, a flagged player is
+  not disconnected but kept on the backends you list, for example the lobby and the login server.
+  On the first connect they are routed to the first allowed backend, and disconnected only if
+  none exists.
+
+- **Passive mode.** `detection.passive` checks nobody at login. `/proxyshield check` and the API
+  keep working, so ProxyShield can sit next to another anti-VPN as a lookup tool.
+
+- **Telegram and VK alerts**, plain text with the same placeholders as the console line, sent
+  through the same bounded queue model as the Discord webhook.
+
+- **`/proxyshield alts <ip|player>`** lists every account seen on the same address, newest first.
+  The history lives in `alts.tsv` next to the config, is pruned after `alts.retention-days`, and
+  groups IPv6 clients by their /64 the same way the cache does.
+
+- **Whitelist and blacklist entries with a reason and an expiry.**
+  `/proxyshield whitelist add <entry> [30m|12h|7d|perm] [reason...]` stores who added the entry,
+  when, why, and until when. `info` shows that, `purge` clears every in-game entry, and `list`
+  marks the timed ones. A timed entry stops matching the moment it runs out, not at the next
+  save. Files written by older builds load unchanged, and a note written by hand after `#` is kept
+  as the reason.
+
+- `/proxyshield stats` counts network/ISP, account-limit and bogon blocks.
+
+### Changed
+
+- **The ISP name is the one most providers agree on**, not the first that answered. Providers
+  disagree on names more than on anything else: for 1.1.1.1 one reports Cloudflare and another
+  the registrant of the block, APNIC. Which of those landed in the alert and in the ISP filter
+  used to depend on network timing.
+
+### Upgrading
+
+New options take effect with their defaults even when your `config.yml` does not list them yet:
+bogon blocking and the account history are on, everything else is off. To see and change them,
+compare your file with the new default or let the plugin write a fresh one.
+
+### Testing
+
+Live on Paper 1.21.11: bogon refusal, the ISP filter, a flag condition on a custom provider,
+debug output, timed whitelist entries with `info` and `purge`, and the account history with two
+connecting clients. Telegram, VK, the connection limit and restricted servers are covered by unit
+tests only so far; the last two cannot be exercised from a loopback address, which ProxyShield
+never checks.
+
 ## 2.5.1
 
 ### Fixed

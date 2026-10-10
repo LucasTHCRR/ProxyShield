@@ -60,6 +60,7 @@ public final class IpLookupService implements LookupProvider {
    private final ProviderDefinition definition;
    private final int timeoutMillis;
    private final TokenBucket limiter;
+   private final boolean debug;
 
    /** One warning per provider, the first time it answers without any risk field. */
    private final AtomicBoolean verdictlessWarned = new AtomicBoolean();
@@ -76,6 +77,7 @@ public final class IpLookupService implements LookupProvider {
       this.definition = definition;
       this.timeoutMillis = config.apiTimeoutSeconds() * 1000;
       this.limiter = new TokenBucket(definition.rateLimitPerMinute());
+      this.debug = config.debug();
    }
 
    /** Convenience for a bare URL template, kept so an existing config keeps working. */
@@ -158,6 +160,9 @@ public final class IpLookupService implements LookupProvider {
                && definition.key() != null) {
             connection.setRequestProperty(definition.keyHeader(), definition.key());
          }
+         for (Map.Entry<String, String> header : definition.headers(ip).entrySet()) {
+            connection.setRequestProperty(header.getKey(), header.getValue());
+         }
 
          int status = connection.getResponseCode();
          if (status >= 300 && status < 400) {
@@ -180,7 +185,13 @@ public final class IpLookupService implements LookupProvider {
             return LookupResult.failed("HTTP " + status);
          }
 
-         return parse(readBody(connection), ip);
+         String body = readBody(connection);
+         LookupResult parsed = parse(body, ip);
+         if (debug) {
+            platform.info("[debug] " + definition.id() + " for " + ip + " -> " + summary(parsed)
+                  + " | raw: " + truncate(body));
+         }
+         return parsed;
       } catch (IOException | RuntimeException failure) {
          return LookupResult.failed(failure.getClass().getSimpleName() + ": "
                + failure.getMessage());
@@ -189,6 +200,19 @@ public final class IpLookupService implements LookupProvider {
             connection.disconnect();
          }
       }
+   }
+
+   private static String summary(LookupResult result) {
+      if (!result.resolved()) {
+         return "failed (" + result.failureReason() + ")";
+      }
+      return "proxy=" + result.proxy() + " hosting=" + result.hosting() + " tor=" + result.tor()
+            + " country=" + result.countryCode() + " isp=" + result.isp() + " asn=" + result.asn();
+   }
+
+   private static String truncate(String body) {
+      String flat = body.replace('\n', ' ').replace('\r', ' ');
+      return flat.length() > 1500 ? flat.substring(0, 1500) + "..." : flat;
    }
 
    private String readBody(HttpURLConnection connection) throws IOException {
@@ -292,9 +316,22 @@ public final class IpLookupService implements LookupProvider {
          proxy = true;
       }
 
+      // Operator rules come last and win: a bypass clears every flag the mapping raised, and a
+      // flag rule raises one the mapping did not.
+      boolean ruled = false;
+      if (ResponseRule.firstMatch(definition.bypassRules(), node) != null) {
+         proxy = false;
+         hosting = false;
+         tor = false;
+         ruled = true;
+      } else if (ResponseRule.firstMatch(definition.flagRules(), node) != null) {
+         proxy = true;
+         ruled = true;
+      }
+
       // A provider that answered but exposed none of its documented fields told us nothing; that
       // is a failure, not a clean result, otherwise a changed API silently disables detection.
-      if (!proxy && !hosting && !tor && score == null && !describes(node)) {
+      if (!ruled && !proxy && !hosting && !tor && score == null && !describes(node)) {
          return LookupResult.failed("response carried none of the expected fields");
       }
 
@@ -302,7 +339,8 @@ public final class IpLookupService implements LookupProvider {
       // the risk fields. The answer is still worth having for the country and the network, but an
       // operator counting on this provider to catch VPNs has to hear about it once: silently
       // scoring zero every time is how a service can sit in the config for months doing nothing.
-      if (!carriesRiskField(node, score) && verdictlessWarned.compareAndSet(false, true)) {
+      if (!ruled && definition.flagRules().isEmpty() && !carriesRiskField(node, score)
+            && verdictlessWarned.compareAndSet(false, true)) {
          platform.warn("Provider " + definition.id() + " answered for " + host()
                + " but its response carries no proxy, VPN or hosting field, so it cannot flag "
                + "anything and contributes 0 of its " + definition.weight() + " weight. Its free "

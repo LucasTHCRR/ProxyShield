@@ -76,7 +76,9 @@ class CheckEngineTest {
             "detection.use-lists", true,
             "detection.use-api", true,
             "detection.block-proxy", true,
-            "detection.block-hosting", true));
+            "detection.block-hosting", true,
+            // The fixtures use documentation ranges (RFC 5737), which the bogon rule would refuse.
+            "detection.block-bogon", false));
    }
 
    private static LookupProvider clean() {

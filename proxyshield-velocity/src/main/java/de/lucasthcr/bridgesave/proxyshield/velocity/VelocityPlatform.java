@@ -64,6 +64,11 @@ final class VelocityPlatform implements Platform {
    }
 
    @Override
+   public boolean proxy() {
+      return true;
+   }
+
+   @Override
    public String version() {
       return server.getPluginManager().fromInstance(plugin)
             .flatMap(container -> container.getDescription().getVersion())

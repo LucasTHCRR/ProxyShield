@@ -195,6 +195,11 @@ public final class PaperMain extends JavaPlugin implements Listener, CommandExec
          public boolean hasPermission(String permission) {
             return sender.hasPermission(permission);
          }
+
+         @Override
+         public String name() {
+            return sender.getName();
+         }
       };
    }
 }

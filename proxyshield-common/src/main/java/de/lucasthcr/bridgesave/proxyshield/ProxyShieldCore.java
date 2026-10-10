@@ -19,11 +19,14 @@
 package de.lucasthcr.bridgesave.proxyshield;
 
 import de.lucasthcr.bridgesave.proxyshield.api.ProxyShieldApi;
+import de.lucasthcr.bridgesave.proxyshield.check.AltTracker;
 import de.lucasthcr.bridgesave.proxyshield.check.CheckEngine;
 import de.lucasthcr.bridgesave.proxyshield.check.CheckVerdict;
+import de.lucasthcr.bridgesave.proxyshield.check.ConnectionLimiter;
 import de.lucasthcr.bridgesave.proxyshield.check.JoinHeuristics;
 import de.lucasthcr.bridgesave.proxyshield.check.TrustStore;
 import de.lucasthcr.bridgesave.proxyshield.config.ShieldConfig;
+import de.lucasthcr.bridgesave.proxyshield.list.AsnFeed;
 import de.lucasthcr.bridgesave.proxyshield.list.ListManager;
 import de.lucasthcr.bridgesave.proxyshield.lookup.LookupResult;
 import de.lucasthcr.bridgesave.proxyshield.message.Messages;
@@ -42,7 +45,9 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Owns every piece of plugin state and exposes the two things a platform adapter needs: a decision
@@ -65,6 +70,10 @@ public final class ProxyShieldCore {
    private final ManagedIpList blacklist;
    private final Statistics statistics = new Statistics();
    private final JoinHeuristics heuristics = new JoinHeuristics();
+   private final ConnectionLimiter limiter = new ConnectionLimiter();
+   private final AltTracker alts;
+   private final AsnFeed asnFeed;
+   private final Set<UUID> restricted = ConcurrentHashMap.newKeySet();
 
    private volatile ShieldConfig config;
    private volatile Messages messages;
@@ -83,12 +92,15 @@ public final class ProxyShieldCore {
       this.lists = new ListManager(platform);
       this.whitelist = new ManagedIpList(platform.dataFolder().resolve("whitelist.txt"));
       this.blacklist = new ManagedIpList(platform.dataFolder().resolve("blacklist.txt"));
+      this.alts = new AltTracker(platform.dataFolder().resolve("alts.tsv"));
+      this.asnFeed = new AsnFeed(platform);
    }
 
    /** Reads the config, restores caches and starts the background work. */
    public void start() {
       platform.saveDefaultConfig();
       config = ShieldConfig.from(platform.loadConfig());
+      config.warnings().forEach(platform::warn);
       messages = Messages.load(platform, config.language());
 
       storage = StorageFactory.create(platform, config);
@@ -106,6 +118,8 @@ public final class ProxyShieldCore {
       // otherwise every proxy keeps serving its own stale copy until the entry expires.
       storage.onRemoteInvalidation(key -> lookups.invalidateLocally(key));
       trust.load();
+      alts.load();
+      asnFeed.loadFromDisk();
 
       if (storage.shared()) {
          platform.info("Verdicts and trust are shared through " + storage.name()
@@ -141,6 +155,7 @@ public final class ProxyShieldCore {
 
       ShieldConfig current = config;
       trust.save();
+      saveAlts(current);
       if (current != null && current.apiPersistCache()) {
          storage.flush();
       }
@@ -148,6 +163,17 @@ public final class ProxyShieldCore {
       storage.close();
       if (reverseDns != null) {
          reverseDns.close();
+      }
+   }
+
+   private void saveAlts(ShieldConfig current) {
+      if (current == null || !current.altsEnabled()) {
+         return;
+      }
+      try {
+         alts.save(current.altsRetentionDays());
+      } catch (IOException failure) {
+         platform.error("Could not write alts.tsv", failure);
       }
    }
 
@@ -192,7 +218,7 @@ public final class ProxyShieldCore {
 
    private void rebuildEngine() {
       engine = new CheckEngine(config, lists, lookups, whitelist, blacklist, reverseDns, trust,
-            heuristics);
+            heuristics).withAsnFeed(asnFeed::contains);
    }
 
    /** Re-reads config.yml and rebuilds everything derived from it. */
@@ -207,6 +233,7 @@ public final class ProxyShieldCore {
       }
 
       config = updated;
+      updated.warnings().forEach(platform::warn);
       messages = Messages.load(platform, updated.language());
 
       // Rebuilt because providers, weights and cache sizing all come from config - but the
@@ -286,9 +313,18 @@ public final class ProxyShieldCore {
       if (lastRefresh == 0L || System.currentTimeMillis() - lastRefresh >= dueAfter) {
          refreshLists();
       }
+      // With the address lists switched off the check above fires every beat, and refreshLists
+      // returns before reaching the network feed, so the feed keeps its own schedule.
+      if (!current.useLists() && current.asnEnabled() && asnFeed.due(dueAfter)) {
+         asnFeed.refresh(current.asnSources(), current.listTimeoutSeconds());
+      }
 
       lookups.purgeExpired();
       heuristics.purgeExpired();
+      limiter.purgeExpired(current.limiterWindowMinutes());
+      whitelist.expireNow();
+      blacklist.expireNow();
+      saveAlts(current);
       storage.purgeExpired();
       storage.flush();
       trust.saveIfDue();
@@ -300,6 +336,9 @@ public final class ProxyShieldCore {
       ShieldConfig current = config;
       if (!current.useLists()) {
          return false;
+      }
+      if (current.asnEnabled()) {
+         asnFeed.refresh(current.asnSources(), current.listTimeoutSeconds());
       }
       return lists.refresh(current.activeListSources(), current.listTimeoutSeconds(),
             current.listDiskCache());
@@ -314,9 +353,15 @@ public final class ProxyShieldCore {
    public ConnectionDecision handleLogin(String playerName, UUID uuid, String ip,
          CheckEngine.PermissionProbe probe) {
       ShieldConfig current = config;
+      if (current.passive()) {
+         // Nothing runs at login; /proxyshield check and the API still look addresses up.
+         return new ConnectionDecision(false, null,
+               CheckVerdict.allow(CheckVerdict.Reason.PASSIVE));
+      }
       CheckVerdict verdict;
       try {
          verdict = engine.check(playerName, uuid, ip, probe);
+         verdict = applyLimiter(current, verdict, uuid, ip);
       } catch (RuntimeException unexpected) {
          platform.error("Check failed for " + playerName + " (" + ip + ")", unexpected);
          // An internal error must not lock players out unless the operator asked for that.
@@ -330,6 +375,15 @@ public final class ProxyShieldCore {
 
       boolean enforced = verdict.blocked() && !current.dryRun();
       statistics.record(verdict, enforced);
+      // On a proxy the player can instead be fenced into the allowed backends.
+      boolean fenced = enforced && uuid != null && platform.proxy()
+            && current.restrictedEnabled();
+      if (fenced) {
+         restricted.add(uuid);
+      }
+      if (current.altsEnabled() && ip != null) {
+         alts.record(ip, uuid, playerName);
+      }
 
       if (verdict.blocked()) {
          alerts.alert(playerName, uuid, ip, verdict, enforced);
@@ -340,8 +394,60 @@ public final class ProxyShieldCore {
          trust.recordCleanLogin(uuid);
       }
 
-      return new ConnectionDecision(enforced, enforced ? kickMessage(verdict, playerName, ip)
-            : null, verdict);
+      boolean deny = enforced && !fenced;
+      return new ConnectionDecision(deny, deny ? kickMessage(verdict, playerName, ip) : null,
+            verdict);
+   }
+
+   /**
+    * Whether a player may be routed to the named backend. Only players flagged while
+    * restricted-server mode was on are limited; everyone else may go anywhere.
+    */
+   public boolean mayJoinServer(UUID uuid, String server) {
+      ShieldConfig current = config;
+      return uuid == null || !restricted.contains(uuid) || !current.restrictedEnabled()
+            || current.restrictedAllows(server);
+   }
+
+   /** Whether the player was flagged and is limited to the allowed backends. */
+   public boolean isRestricted(UUID uuid) {
+      return uuid != null && restricted.contains(uuid);
+   }
+
+   /** Called when a player leaves the proxy, so the next login is judged afresh. */
+   public void playerLeft(UUID uuid) {
+      if (uuid != null) {
+         restricted.remove(uuid);
+      }
+   }
+
+   /** The text shown when a restricted player is refused a backend. */
+   public String restrictedMessage(String server) {
+      return messages.get("restricted-server", Map.of("server", server == null ? "?" : server));
+   }
+
+   /**
+    * Applies the per-address cap to a connection the engine let through. Whitelisted, local and
+    * bypassing connections are left alone: a LAN party or a staff member must never hit the cap.
+    */
+   private CheckVerdict applyLimiter(ShieldConfig current, CheckVerdict verdict, UUID uuid,
+         String ip) {
+      if (!current.limiterEnabled() || verdict.blocked() || ip == null) {
+         return verdict;
+      }
+      switch (verdict.reason()) {
+         case BYPASS_PERMISSION, WHITELISTED_IP, WHITELISTED_PLAYER, LOCAL_ADDRESS -> {
+            return verdict;
+         }
+         default -> {
+         }
+      }
+      if (limiter.exceeds(ip, uuid, current.limiterMax(), current.limiterWindowMinutes(),
+            platform.onlinePlayers())) {
+         return CheckVerdict.deny(CheckVerdict.Reason.CONNECTION_LIMIT,
+               current.limiterMax() + " per address", verdict.lookup());
+      }
+      return verdict;
    }
 
    private String kickMessage(CheckVerdict verdict, String player, String ip) {
@@ -385,6 +491,14 @@ public final class ProxyShieldCore {
 
    public Statistics statistics() {
       return statistics;
+   }
+
+   public AsnFeed asnFeed() {
+      return asnFeed;
+   }
+
+   public AltTracker alts() {
+      return alts;
    }
 
    public TrustStore trust() {

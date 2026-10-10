@@ -59,6 +59,11 @@ final class BungeePlatform implements Platform {
    }
 
    @Override
+   public boolean proxy() {
+      return true;
+   }
+
+   @Override
    public String version() {
       return plugin.getDescription().getVersion();
    }

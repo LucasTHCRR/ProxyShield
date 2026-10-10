@@ -32,6 +32,8 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 /**
  * Decides whether a connection may proceed.
@@ -63,6 +65,7 @@ public final class CheckEngine {
    private final ReverseDns reverseDns;
    private final TrustStore trust;
    private final JoinHeuristics heuristics;
+   private volatile Predicate<String> listedAsn = asn -> false;
 
    public CheckEngine(ShieldConfig config, ListManager lists, LookupProvider lookups,
          ManagedIpList whitelist, ManagedIpList blacklist) {
@@ -80,6 +83,12 @@ public final class CheckEngine {
       this.reverseDns = reverseDns;
       this.trust = trust;
       this.heuristics = heuristics;
+   }
+
+   /** Supplies networks blocked by a downloaded list, on top of {@code detection.asn.blocked}. */
+   public CheckEngine withAsnFeed(Predicate<String> feed) {
+      this.listedAsn = feed == null ? asn -> false : feed;
+      return this;
    }
 
    /**
@@ -113,6 +122,10 @@ public final class CheckEngine {
 
       if (IpAddresses.isLocal(ip)) {
          return CheckVerdict.allow(CheckVerdict.Reason.LOCAL_ADDRESS);
+      }
+
+      if (config.blockBogon() && IpAddresses.isBogon(ip)) {
+         return CheckVerdict.deny(CheckVerdict.Reason.BOGON, ip, LookupResult.UNKNOWN);
       }
 
       // An operator's explicit blacklist outranks any inference below, trust included.
@@ -157,6 +170,11 @@ public final class CheckEngine {
       CheckVerdict asnVerdict = useProviderFlags ? checkAsn(result) : null;
       if (asnVerdict != null) {
          return asnVerdict;
+      }
+
+      CheckVerdict ispVerdict = checkIsp(result);
+      if (ispVerdict != null) {
+         return ispVerdict;
       }
 
       score += reverseDnsWeight(ip, signals);
@@ -247,11 +265,40 @@ public final class CheckEngine {
       if (config.allowedAsns().contains(result.asn())) {
          return CheckVerdict.allow(CheckVerdict.Reason.ALLOWED_ASN, result);
       }
-      if (config.blockedAsns().contains(result.asn())) {
+      if (config.blockedAsns().contains(result.asn()) || listedAsn.test(result.asn())) {
          return CheckVerdict.deny(CheckVerdict.Reason.ASN,
                result.asn() + " " + result.ispOrUnknown(), result);
       }
       return null;
+   }
+
+   /**
+    * Applies the ISP filter. Runs whether or not provider flags count, because an operator who
+    * names an ISP has already made the decision the flags would otherwise make.
+    *
+    * @return a verdict when a pattern decided the matter, otherwise {@code null}
+    */
+   private CheckVerdict checkIsp(LookupResult result) {
+      String isp = result.isp();
+      if (isp == null || isp.isBlank()) {
+         return null;
+      }
+      if (matchesAny(config.allowedIsps(), isp)) {
+         return CheckVerdict.allow(CheckVerdict.Reason.ALLOWED_ISP, result);
+      }
+      if (matchesAny(config.blockedIsps(), isp)) {
+         return CheckVerdict.deny(CheckVerdict.Reason.ISP, isp, result);
+      }
+      return null;
+   }
+
+   private static boolean matchesAny(List<Pattern> patterns, String value) {
+      for (Pattern pattern : patterns) {
+         if (pattern.matcher(value).find()) {
+            return true;
+         }
+      }
+      return false;
    }
 
    /** Whether a hosting flag is waved through because the connection type says otherwise. */

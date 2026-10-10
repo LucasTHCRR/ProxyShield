@@ -58,6 +58,7 @@ public final class AlertDispatcher {
 
    private final Platform platform;
    private final DiscordWebhook webhook;
+   private final ChatNotifier chats;
    private final CommandActions commands;
    private final Path logFile;
    private final ReentrantLock logLock = new ReentrantLock();
@@ -72,6 +73,7 @@ public final class AlertDispatcher {
       this.config = config;
       this.messages = messages;
       this.webhook = webhook;
+      this.chats = new ChatNotifier(platform, config);
       this.commands = commands;
       this.logFile = platform.dataFolder().resolve("blocks.log");
    }
@@ -81,6 +83,7 @@ public final class AlertDispatcher {
       this.messages = messages;
       this.logFileBroken = false;
       commands.applyConfig(config);
+      chats.applyConfig(config);
    }
 
    /**
@@ -105,6 +108,7 @@ public final class AlertDispatcher {
       }
 
       webhook.enqueue(player, uuid, ip, verdict, enforced);
+      chats.enqueue(player, ip, verdict, enforced);
       commands.onFlag(player, uuid, ip, verdict, enforced);
    }
 
@@ -191,6 +195,10 @@ public final class AlertDispatcher {
       } catch (IOException failure) {
          platform.warn("Could not rotate blocks.log: " + failure.getMessage());
       }
+   }
+
+   public ChatNotifier chats() {
+      return chats;
    }
 
    public Path logFile() {
