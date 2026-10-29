@@ -30,6 +30,10 @@
   Two uses, both set under the same key: `fallback-block-hosting` (on) refuses a hosting-like
   network when no provider could answer, and `fast-admit-end-user` (off) skips the provider lookup
   for end-user networks and keeps the quota for the rest. The source is empty by default.
+- **Redis no longer holds up the start or needs a reload.** With `storage.type: redis` the plugin
+  answers from its local store at once and connects to Redis in the background, retrying every 5
+  to 60 seconds. A start while Redis is down and a recovery afterwards both work without anybody
+  touching the plugin.
 - **Faster first start.** Without a cached list the download begins at once instead of after an
   8 second grace period, and the sources load side by side (at most three connections per host,
   the network feed alongside). A fresh install is protected about a second after it enables

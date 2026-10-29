@@ -46,17 +46,12 @@ public final class StorageFactory {
    }
 
    private static ShieldStorage redis(Platform platform, ShieldConfig config) {
-      RedisStorage redis = new RedisStorage(platform, config.redisHost(), config.redisPort(),
-            config.redisUsername(), config.redisPassword(), config.redisDatabase(),
-            config.redisTimeoutMillis(), config.redisPrefix(), config.serverId());
-      if (redis.available()) {
-         return redis;
-      }
-
-      redis.close();
-      platform.warn("Redis is unreachable, falling back to file storage. Verdicts will not be "
-            + "shared with the other servers until it comes back and the plugin is reloaded.");
-      return new FileStorage(platform);
+      // The local store answers from the first login; Redis is connected in the background and
+      // takes over as soon as it answers, now or after an outage.
+      return new FailoverStorage(platform, new FileStorage(platform), () -> new RedisStorage(
+            platform, config.redisHost(), config.redisPort(), config.redisUsername(),
+            config.redisPassword(), config.redisDatabase(), config.redisTimeoutMillis(),
+            config.redisPrefix(), config.serverId()));
    }
 
    private static ShieldStorage sql(Platform platform, ShieldConfig config, String type) {
