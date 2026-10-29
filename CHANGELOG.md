@@ -11,6 +11,12 @@
 
 ### Changed
 
+- **Staged lookups.** A lookup now asks the first two providers (`api.first-wave`, 0 asks all at
+  once) and stops there when both answer and neither flags the address. A flag, a failure or a slow
+  answer brings in the rest. Providers that are out of quota or recovering are skipped instead of
+  being asked and failing. An ordinary address costs two requests instead of five, so the free
+  quotas serve about twice as many new addresses. The default provider order puts the strongest
+  keyless ones first (blackbox, ip-check, iplocate, ip-api, iprisk).
 - **Faster first start.** Without a cached list the download begins at once instead of after an
   8 second grace period, and the sources load side by side (at most three connections per host,
   the network feed alongside). A fresh install is protected about a second after it enables

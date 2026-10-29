@@ -432,6 +432,11 @@ public final class IpLookupService implements LookupProvider {
       }
    }
 
+   /** Whether a request would be sent right now: not tripped and a token left. Consumes nothing. */
+   public boolean ready() {
+      return !tripped() && limiter.hasToken();
+   }
+
    /** Whether the endpoint is currently being skipped, for {@code /proxyshield info}. */
    public boolean tripped() {
       long until = breakerOpenUntil.get();
@@ -486,6 +491,13 @@ public final class IpLookupService implements LookupProvider {
          this.capacity = Math.max(1, perMinute);
          this.tokensPerMilli = this.capacity / 60_000.0;
          this.tokens = this.capacity;
+      }
+
+      boolean hasToken() {
+         synchronized (lock) {
+            long now = System.currentTimeMillis();
+            return Math.min(capacity, tokens + (now - lastRefill) * tokensPerMilli) >= 1.0;
+         }
       }
 
       boolean tryConsume() {

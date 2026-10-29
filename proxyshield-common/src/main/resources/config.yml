@@ -336,6 +336,13 @@ api:
   mode: consensus
   required-score: 1.5
 
+  # How many providers a lookup asks first. If they all answer and none flags the address, the rest
+  # are never asked, so an ordinary address costs this many requests instead of one per provider
+  # and the free quotas last longer. A flag, a failure or a slow answer brings in the others.
+  # Providers are tried in the order listed under "providers" below, skipping any that are out of
+  # quota or recovering. 0 asks every provider at once.
+  first-wave: 2
+
   # Per request timeout, and the ceiling for the whole lookup stage of one login.
   # Whatever has answered by then decides; nobody waits longer than this.
   timeout-seconds: 4
@@ -374,14 +381,26 @@ api:
   providers:
 
     # ---- free, no key needed ----
-
-    # The classic. HTTPS only on paid plans, hence plain http.
-    ip-api:
-      enabled: true
-      weight: 1.0
+    # The order is the order lookups use: the first api.first-wave providers are asked first.
+    # Strongest keyless ones first, measured in the public benchmark.
 
     # Proxy, VPN, Tor, cloud and Spamhaus data. Free and unlimited.
     blackbox:
+      enabled: true
+      weight: 1.0
+
+    # Plain true/false answer.
+    ip-check:
+      enabled: true
+      weight: 1.0
+
+    iplocate:
+      enabled: true
+      weight: 1.5
+      key: ""
+
+    # The classic. HTTPS only on paid plans, hence plain http.
+    ip-api:
       enabled: true
       weight: 1.0
 
@@ -399,11 +418,6 @@ api:
     # identification only and flags nothing, so it stays off until you add one.
     ipapi-is:
       enabled: false
-      weight: 1.5
-      key: ""
-
-    iplocate:
-      enabled: true
       weight: 1.5
       key: ""
 
@@ -434,10 +448,6 @@ api:
 
     marvinmc:
       enabled: false
-      weight: 1.0
-
-    ip-check:
-      enabled: true
       weight: 1.0
 
     zowi:

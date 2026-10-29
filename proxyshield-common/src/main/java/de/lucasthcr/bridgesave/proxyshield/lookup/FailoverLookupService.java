@@ -71,6 +71,8 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
    private final ExpiringCache<String, LookupResult> cache;
    private final ShieldConfig.LookupMode mode;
    private final double requiredScore;
+   private final int firstWave;
+   private final AtomicLong stagedSkips = new AtomicLong();
    private final long cleanTtlMillis;
    private final long flaggedTtlMillis;
    private final long totalBudgetMillis;
@@ -113,6 +115,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       this.storage = storage;
       this.mode = config.lookupMode();
       this.requiredScore = config.requiredScore();
+      this.firstWave = config.apiFirstWave();
       this.cleanTtlMillis = config.apiCacheMinutes() * 60_000L;
       this.flaggedTtlMillis = config.apiFlaggedCacheMinutes() * 60_000L;
       this.totalBudgetMillis = config.apiTotalTimeoutSeconds() * 1000L;
@@ -284,50 +287,46 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
    }
 
    /**
-    * Asks every provider at once and adds up the weight of those that flagged the address.
+    * Asks the providers and adds up the weight of those that flagged the address.
     * <p>
-    * Returns as soon as the threshold is reached - the remaining requests are cancelled, so the
-    * common case of an obvious VPN costs the latency of the fastest provider that recognises it,
-    * not of the slowest one in the list.
+    * The first wave is the first {@code api.first-wave} providers that are not tripped or out of
+    * quota. When every one of them answers and none flags the address, that settles it and the
+    * rest are never asked, so an ordinary address costs a couple of requests instead of one per
+    * provider and the free quotas go further. Anything else (a flag, a failure, a slow answer)
+    * brings in the remaining providers. A first wave of 0 asks everyone at once.
+    * <p>
+    * Either way the round returns as soon as the threshold is reached and cancels what is still
+    * running, so an obvious VPN costs the latency of the fastest provider that recognises it.
     */
    private Round consensus(String ip) {
       ExecutorCompletionService<ProviderAnswer> completions =
             new ExecutorCompletionService<>(executor);
       List<Future<ProviderAnswer>> pending = new ArrayList<>(providers.size());
+
+      List<IpLookupService> ready = new ArrayList<>(providers.size());
       for (IpLookupService provider : providers) {
-         pending.add(completions.submit(() ->
-               new ProviderAnswer(provider.id(), provider.weight(), provider.lookup(ip))));
+         if (provider.ready()) {
+            ready.add(provider);
+         }
       }
+      if (ready.isEmpty()) {
+         ready.addAll(providers);
+      }
+      int firstSize = firstWave > 0 && firstWave < ready.size() ? firstWave : ready.size();
 
       Merge merge = new Merge();
       long deadline = System.currentTimeMillis() + totalBudgetMillis;
       try {
-         for (int answered = 0; answered < pending.size(); answered++) {
-            long remaining = deadline - System.currentTimeMillis();
-            if (remaining <= 0) {
-               budgetExceeded.incrementAndGet();
-               break;
-            }
-
-            // Take answers in the order they arrive, so a slow provider never holds up a verdict
-            // a fast one has already settled.
-            Future<ProviderAnswer> completed = completions.poll(remaining, TimeUnit.MILLISECONDS);
-            if (completed == null) {
-               budgetExceeded.incrementAndGet();
-               break;
-            }
-
-            ProviderAnswer answer;
-            try {
-               answer = completed.get();
-            } catch (ExecutionException failed) {
-               continue;
-            }
-
-            merge.add(answer);
-            if (merge.proxyScore >= requiredScore) {
+         submit(completions, pending, ready.subList(0, firstSize), ip);
+         int state = collect(completions, firstSize, merge, deadline);
+         if (state == COLLECT_DONE && firstSize < ready.size()) {
+            if (merge.answered == firstSize && merge.proxyScore == 0.0 && merge.hostingScore == 0.0) {
                merge.settledEarly();
-               break;
+               stagedSkips.incrementAndGet();
+            } else {
+               int rest = ready.size() - firstSize;
+               submit(completions, pending, ready.subList(firstSize, ready.size()), ip);
+               collect(completions, rest, merge, deadline);
             }
          }
       } catch (InterruptedException interrupted) {
@@ -339,6 +338,52 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       }
 
       return new Round(merge.toResult(requiredScore), merge.complete(pending.size()));
+   }
+
+   private static final int COLLECT_DONE = 0;
+   private static final int COLLECT_SETTLED = 1;
+   private static final int COLLECT_BUDGET = 2;
+
+   private void submit(ExecutorCompletionService<ProviderAnswer> completions,
+         List<Future<ProviderAnswer>> pending, List<IpLookupService> group, String ip) {
+      for (IpLookupService provider : group) {
+         pending.add(completions.submit(() ->
+               new ProviderAnswer(provider.id(), provider.weight(), provider.lookup(ip))));
+      }
+   }
+
+   /** Takes {@code count} answers in the order they arrive, or stops on a settled verdict. */
+   private int collect(ExecutorCompletionService<ProviderAnswer> completions, int count,
+         Merge merge, long deadline) throws InterruptedException {
+      for (int taken = 0; taken < count; taken++) {
+         long remaining = deadline - System.currentTimeMillis();
+         if (remaining <= 0) {
+            budgetExceeded.incrementAndGet();
+            return COLLECT_BUDGET;
+         }
+
+         // Take answers in the order they arrive, so a slow provider never holds up a verdict
+         // a fast one has already settled.
+         Future<ProviderAnswer> completed = completions.poll(remaining, TimeUnit.MILLISECONDS);
+         if (completed == null) {
+            budgetExceeded.incrementAndGet();
+            return COLLECT_BUDGET;
+         }
+
+         ProviderAnswer answer;
+         try {
+            answer = completed.get();
+         } catch (ExecutionException failed) {
+            continue;
+         }
+
+         merge.add(answer);
+         if (merge.proxyScore >= requiredScore) {
+            merge.settledEarly();
+            return COLLECT_SETTLED;
+         }
+      }
+      return COLLECT_DONE;
    }
 
    /**

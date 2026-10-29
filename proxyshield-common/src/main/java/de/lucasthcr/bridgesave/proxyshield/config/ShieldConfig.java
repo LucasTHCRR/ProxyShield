@@ -127,6 +127,7 @@ public final class ShieldConfig {
    private final List<String> apiProviders;
    private final List<ProviderDefinition> providers;
    private final LookupMode lookupMode;
+   private final int apiFirstWave;
    private final double requiredScore;
    private final int apiTimeoutSeconds;
    private final int apiTotalTimeoutSeconds;
@@ -275,6 +276,7 @@ public final class ShieldConfig {
       this.apiUrl = node.getString("api.url", "");
       this.apiProviders = List.copyOf(node.getStringList("api.providers"));
       this.lookupMode = LookupMode.parse(node.getString("api.mode", "consensus"));
+      this.apiFirstWave = clamp(node.getInt("api.first-wave", 2), 0, 32);
       this.requiredScore = Math.max(0.1, node.getDouble("api.required-score", 1.0));
       this.apiTimeoutSeconds = clamp(node.getInt("api.timeout-seconds", 4), 1, 60);
       this.apiTotalTimeoutSeconds = clamp(node.getInt("api.total-timeout-seconds", 6), 1, 120);
@@ -858,6 +860,11 @@ public final class ShieldConfig {
    /** Provider definitions in configured order, credentials and weights already applied. */
    public List<ProviderDefinition> providers() {
       return providers;
+   }
+
+   /** Providers asked first in consensus mode, 0 for all at once. */
+   public int apiFirstWave() {
+      return apiFirstWave;
    }
 
    public LookupMode lookupMode() {

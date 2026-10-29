@@ -440,4 +440,75 @@ class ConsensusLookupTest {
          }
       }
    }
+
+   @Nested
+   @DisplayName("Staged lookups")
+   class Staged {
+
+      private final java.util.concurrent.atomic.AtomicInteger first = new java.util.concurrent.atomic.AtomicInteger();
+      private final java.util.concurrent.atomic.AtomicInteger second = new java.util.concurrent.atomic.AtomicInteger();
+      private final java.util.concurrent.atomic.AtomicInteger third = new java.util.concurrent.atomic.AtomicInteger();
+
+      private FailoverLookupService staged(int firstWave, String... bodies) {
+         java.util.concurrent.atomic.AtomicInteger[] counters = {first, second, third};
+         Map<String, Object> values = new LinkedHashMap<>();
+         values.put("api.mode", "consensus");
+         values.put("api.required-score", 1.5);
+         values.put("api.first-wave", firstWave);
+         values.put("api.total-timeout-seconds", 10);
+         for (int index = 0; index < bodies.length; index++) {
+            String path = "/stage" + index + "-" + System.nanoTime();
+            String body = bodies[index];
+            java.util.concurrent.atomic.AtomicInteger counter = counters[index];
+            serve(path, exchange -> {
+               counter.incrementAndGet();
+               respond(exchange, 200, body);
+            });
+            String id = "s" + index;
+            values.put("api.providers." + id + ".enabled", true);
+            values.put("api.providers." + id + ".url", baseUrl + path + "/{ip}");
+            values.put("api.providers." + id + ".weight", 1.0);
+            values.put("api.providers." + id + ".proxy-fields", List.of("proxy"));
+            values.put("api.providers." + id + ".hosting-fields", List.of("hosting"));
+         }
+         return new FailoverLookupService(platform, ShieldConfig.from(new MapConfigNode(values)), null, null);
+      }
+
+      @Test
+      @DisplayName("A clean first wave settles the lookup without asking the rest")
+      void cleanFirstWaveSkipsTheRest() {
+         try (FailoverLookupService service = staged(2, "{\"proxy\":false}", "{\"proxy\":false}",
+               "{\"proxy\":true}")) {
+            LookupResult result = service.lookup(IP);
+
+            assertFalse(result.proxy());
+            assertEquals(1, first.get());
+            assertEquals(1, second.get());
+            assertEquals(0, third.get(), "the third provider must not be asked");
+         }
+      }
+
+      @Test
+      @DisplayName("A flag in the first wave brings in the others")
+      void aFlagAsksTheRest() {
+         try (FailoverLookupService service = staged(2, "{\"proxy\":true}", "{\"proxy\":false}",
+               "{\"proxy\":true}")) {
+            LookupResult result = service.lookup(IP);
+
+            assertTrue(result.proxy());
+            assertEquals(1, third.get());
+         }
+      }
+
+      @Test
+      @DisplayName("A first wave of 0 asks everyone at once, as before")
+      void zeroAsksEveryone() {
+         try (FailoverLookupService service = staged(0, "{\"proxy\":false}", "{\"proxy\":false}",
+               "{\"proxy\":false}")) {
+            service.lookup(IP);
+
+            assertEquals(1, third.get());
+         }
+      }
+   }
 }
