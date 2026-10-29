@@ -278,7 +278,7 @@ public final class ShieldConfig {
       this.requiredScore = Math.max(0.1, node.getDouble("api.required-score", 1.0));
       this.apiTimeoutSeconds = clamp(node.getInt("api.timeout-seconds", 4), 1, 60);
       this.apiTotalTimeoutSeconds = clamp(node.getInt("api.total-timeout-seconds", 6), 1, 120);
-      this.apiMaxParallel = clamp(node.getInt("api.max-parallel", 6), 1, 32);
+      this.apiMaxParallel = clamp(node.getInt("api.max-parallel", 64), 1, 256);
       this.apiCacheMinutes = Math.max(1L, node.getLong("api.cache-minutes", 360L));
       this.apiFlaggedCacheMinutes =
             Math.max(1L, node.getLong("api.flagged-cache-minutes", 1440L));

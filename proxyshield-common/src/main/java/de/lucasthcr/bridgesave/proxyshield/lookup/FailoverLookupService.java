@@ -133,8 +133,10 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       }
 
       this.cache = inheritableCache(previous, config);
+      // One pool for every login. Sizing it to the provider count meant a single lookup used all of
+      // it, so a burst of joins queued behind each other until the total timeout ran out.
       this.executor = Executors.newFixedThreadPool(
-            Math.min(config.apiMaxParallel(), Math.max(1, providers.size())),
+            Math.max(config.apiMaxParallel(), Math.max(1, providers.size())),
             daemonThreads());
    }
 

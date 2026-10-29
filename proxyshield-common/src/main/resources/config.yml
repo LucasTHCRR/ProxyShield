@@ -341,8 +341,9 @@ api:
   timeout-seconds: 4
   total-timeout-seconds: 6
 
-  # How many providers may be queried at the same time.
-  max-parallel: 6
+  # How many provider requests may run at the same time, across all logins. A lookup asks every
+  # provider at once, so 64 serves about a dozen logins per second even when providers are slow.
+  max-parallel: 64
 
   # How long an answer stays cached. Flagged addresses are kept much longer:
   # a confirmed VPN range stays one for days, while "looked clean an hour ago"

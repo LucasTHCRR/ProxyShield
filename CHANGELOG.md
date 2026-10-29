@@ -2,6 +2,13 @@
 
 ## 3.0.1-BETA
 
+### Fixed
+
+- **Bursts of logins no longer queue behind each other.** The lookup pool was sized to the number
+  of providers, so one login used all of it and every other login waited, some until the 6 second
+  total timeout and then got in unchecked. `api.max-parallel` now sizes the pool (default 64, up to
+  256). In a local join test, 21 of 60 joins in 6 seconds reached a provider before, all 60 now.
+
 ### Changed
 
 - **Faster first start.** Without a cached list the download begins at once instead of after an
