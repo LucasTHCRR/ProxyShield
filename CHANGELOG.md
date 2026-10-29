@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.0.1-BETA
+## 3.0.1-RELEASE
 
 ### Fixed
 
