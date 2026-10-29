@@ -226,4 +226,24 @@ class IpRangeSetTest {
       assertFalse(IpRangeSet.EMPTY.contains("1.2.3.4"));
       assertEquals(0, IpRangeSet.EMPTY.ipv4AddressCount());
    }
+
+   @Test
+   @DisplayName("Builders collected on different threads merge into one set")
+   void mergedBuildersKeepEveryRange() {
+      IpRangeSet.Builder first = IpRangeSet.builder();
+      first.add("1.2.3.0/24");
+      IpRangeSet.Builder second = IpRangeSet.builder();
+      second.add("5.6.7.8");
+      second.add("2001:db8::/32");
+
+      IpRangeSet.Builder merged = IpRangeSet.builder();
+      merged.addAll(first);
+      merged.addAll(second);
+      IpRangeSet set = merged.build();
+
+      assertTrue(set.contains("1.2.3.77"));
+      assertTrue(set.contains("5.6.7.8"));
+      assertTrue(set.contains("2001:db8::1"));
+      assertFalse(set.contains("9.9.9.9"));
+   }
 }

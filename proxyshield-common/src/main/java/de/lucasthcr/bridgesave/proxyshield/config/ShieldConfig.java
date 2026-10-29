@@ -140,6 +140,7 @@ public final class ShieldConfig {
    // detection extras
    private final boolean blockTor;
    private final boolean allowResidentialHosting;
+   private final double hostingMinScore;
    private final boolean asnEnabled;
    private final Set<String> blockedAsns;
    private final Set<String> allowedAsns;
@@ -289,6 +290,7 @@ public final class ShieldConfig {
       this.blockTor = node.getBoolean("detection.block-tor", true);
       this.allowResidentialHosting =
             node.getBoolean("detection.allow-residential-hosting", true);
+      this.hostingMinScore = Math.max(0.0, node.getDouble("detection.hosting-min-score", 0.5));
       this.asnEnabled = node.getBoolean("detection.asn.enabled", true);
       this.blockedAsns = normalizedAsns(node.getStringList("detection.asn.blocked"));
       this.allowedAsns = normalizedAsns(node.getStringList("detection.asn.allowed"));
@@ -886,6 +888,11 @@ public final class ShieldConfig {
 
    public boolean blockTor() {
       return blockTor;
+   }
+
+   /** Score a hosting flag needs from other signals before it blocks. */
+   public double hostingMinScore() {
+      return hostingMinScore;
    }
 
    /** Whether a residential or mobile connection type overrides a hosting flag. */

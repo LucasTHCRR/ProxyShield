@@ -208,11 +208,56 @@ class CheckEngineTest {
    }
 
    @Nested
+   @DisplayName("The minimum score for a hosting flag")
+   class HostingMinScore {
+
+      private CheckEngine engineWith(double minScore, double confidence) throws IOException {
+         Map<String, Object> values = baseConfig();
+         values.put("detection.hosting-min-score", minScore);
+         return engine(values,
+               ip -> LookupResult.of(false, true, false, "ZA", "South Africa", "Afrihost",
+                     "AS37611", null, confidence, List.of("ip-api")),
+               List.of());
+      }
+
+      @Test
+      @DisplayName("a hosting flag with no other signal lets an ordinary ISP in")
+      void hostingAloneIsNotEnough() throws IOException {
+         CheckVerdict verdict = engineWith(0.5, 0.0)
+               .check("Steve", null, "203.0.113.7", CheckEngine.PermissionProbe.NONE);
+
+         assertFalse(verdict.blocked());
+      }
+
+      @Test
+      @DisplayName("hosting plus a proxy vote still blocks")
+      void hostingWithAnotherSignalBlocks() throws IOException {
+         CheckVerdict verdict = engineWith(0.5, 0.6)
+               .check("Steve", null, "203.0.113.7", CheckEngine.PermissionProbe.NONE);
+
+         assertTrue(verdict.blocked());
+         assertEquals(CheckVerdict.Reason.HOSTING, verdict.reason());
+      }
+
+      @Test
+      @DisplayName("zero restores blocking every hosting flag")
+      void zeroBlocksEveryHostingFlag() throws IOException {
+         CheckVerdict verdict = engineWith(0.0, 0.0)
+               .check("Steve", null, "203.0.113.7", CheckEngine.PermissionProbe.NONE);
+
+         assertTrue(verdict.blocked());
+         assertEquals(CheckVerdict.Reason.HOSTING, verdict.reason());
+      }
+   }
+
+   @Nested
    @DisplayName("The residential exemption to the hosting block")
    class ResidentialExemption {
 
       private CheckEngine engineFor(String connectionType) throws IOException {
-         return engine(baseConfig(),
+         Map<String, Object> values = baseConfig();
+         values.put("detection.hosting-min-score", 0.0);
+         return engine(values,
                ip -> LookupResult.of(false, true, false, "CH", "Switzerland", "Proton AG",
                      "AS62371", connectionType, 0.0, List.of("iplocate")),
                List.of());

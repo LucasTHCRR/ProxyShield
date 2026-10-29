@@ -176,6 +176,14 @@ public final class IpRangeSet {
       private int accepted;
       private int rejected;
 
+      /** Takes over everything another builder collected. */
+      public void addAll(Builder other) {
+         v4.addAll(other.v4);
+         v6.addAll(other.v6);
+         accepted += other.accepted;
+         rejected += other.rejected;
+      }
+
       /** Adds a raw list line. Returns {@code true} if it produced a usable range. */
       public boolean add(String rawEntry) {
          String entry = IpAddresses.normalizeListEntry(rawEntry);

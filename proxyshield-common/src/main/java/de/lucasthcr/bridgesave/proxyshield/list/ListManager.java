@@ -64,7 +64,7 @@ public final class ListManager {
    public record RetryPolicy(int maxAttempts, long baseBackoffMillis, long maxBackoffMillis,
          long betweenSourcesMillis) {
 
-      public static final RetryPolicy DEFAULT = new RetryPolicy(3, 3_000L, 30_000L, 750L);
+      public static final RetryPolicy DEFAULT = new RetryPolicy(3, 3_000L, 30_000L, 300L);
    }
 
    private final RetryPolicy retryPolicy;
@@ -171,23 +171,22 @@ public final class ListManager {
          int succeeded = 0;
          boolean rateLimited = false;
 
+         Outcome[] outcomes = fetchAll(sources, timeoutSeconds, writeDiskCache);
          for (int i = 0; i < sources.size(); i++) {
-            if (i > 0) {
-               pause(retryPolicy.betweenSourcesMillis());
-            }
-
             String source = sources.get(i);
-            try {
-               Fetched result = fetch(source, timeoutSeconds, writeDiskCache, builder);
+            Outcome outcome = outcomes[i];
+            if (outcome.failure() == null) {
+               builder.addAll(outcome.builder());
                succeeded++;
-               platform.info("Loaded " + result.entries() + " entries from " + source
-                     + (result.fromCache() ? " (unchanged, used the cached copy)" : ""));
-            } catch (RateLimitedException limited) {
+               platform.info("Loaded " + outcome.fetched().entries() + " entries from " + source
+                     + (outcome.fetched().fromCache() ? " (unchanged, used the cached copy)" : ""));
+            } else if (outcome.failure() instanceof RateLimitedException) {
                rateLimited = true;
                failures.add(source + " (rate limited)");
                platform.warn("Rate limited by " + hostOf(source)
                      + " after " + retryPolicy.maxAttempts() + " attempts: " + source);
-            } catch (Exception failed) {
+            } else {
+               Exception failed = outcome.failure();
                failures.add(source + " (" + failed.getClass().getSimpleName() + ": "
                      + failed.getMessage() + ")");
                platform.warn("Failed to load list " + source + ": " + failed.getMessage());
@@ -217,6 +216,63 @@ public final class ListManager {
    }
 
    /** Says plainly whether the server currently has list protection, and what to do about it. */
+   /** Connections one feed host sees at the same time. */
+   private static final int MAX_LANES_PER_HOST = 3;
+
+   private record Outcome(IpRangeSet.Builder builder, Fetched fetched, Exception failure) {
+   }
+
+   /**
+    * Downloads every source. Hosts run side by side and one host gets a few lanes at most, each lane
+    * working through its sources with the configured gap, so a feed host still sees a polite rate.
+    */
+   private Outcome[] fetchAll(List<String> sources, int timeoutSeconds, boolean writeDiskCache) {
+      Outcome[] outcomes = new Outcome[sources.size()];
+      java.util.Map<String, List<Integer>> byHost = new java.util.LinkedHashMap<>();
+      java.util.Map<String, Integer> perHost = new java.util.HashMap<>();
+      for (int i = 0; i < sources.size(); i++) {
+         String host = hostOf(sources.get(i));
+         int lane = perHost.merge(host, 1, Integer::sum) % MAX_LANES_PER_HOST;
+         byHost.computeIfAbsent(host + "#" + lane, key -> new ArrayList<>()).add(i);
+      }
+
+      List<Thread> workers = new ArrayList<>();
+      for (List<Integer> group : byHost.values()) {
+         Thread worker = new Thread(() -> {
+            for (int n = 0; n < group.size(); n++) {
+               if (n > 0) {
+                  pause(retryPolicy.betweenSourcesMillis());
+               }
+               int index = group.get(n);
+               IpRangeSet.Builder local = IpRangeSet.builder();
+               try {
+                  Fetched result = fetch(sources.get(index), timeoutSeconds, writeDiskCache, local);
+                  outcomes[index] = new Outcome(local, result, null);
+               } catch (Exception failed) {
+                  outcomes[index] = new Outcome(null, null, failed);
+               }
+            }
+         }, "ProxyShield-lists-" + workers.size());
+         worker.setDaemon(true);
+         workers.add(worker);
+         worker.start();
+      }
+      for (Thread worker : workers) {
+         try {
+            worker.join();
+         } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            break;
+         }
+      }
+      for (int i = 0; i < outcomes.length; i++) {
+         if (outcomes[i] == null) {
+            outcomes[i] = new Outcome(null, null, new IOException("interrupted"));
+         }
+      }
+      return outcomes;
+   }
+
    private void reportTotalFailure(boolean rateLimited) {
       if (ranges.rangeCount() > 0) {
          platform.warn("No list source could be downloaded, keeping the previous "

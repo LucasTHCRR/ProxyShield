@@ -1,5 +1,5 @@
 # ============================================================================
-#  ProxyShield v3.0.0  -  Anti-VPN / Anti-Proxy
+#  ProxyShield v3.0.1-BETA  -  Anti-VPN / Anti-Proxy
 #  Paper - Folia - BungeeCord - Velocity - Sponge
 #
 #  Every option below behaves identically on all five platforms.
@@ -43,6 +43,11 @@ detection:
   # or mobile. Mobile carriers behind CGNAT get listed in hosting ranges surprisingly
   # often, and they are real players. Turn this off only if you want no exceptions.
   allow-residential-hosting: true
+
+  # A hosting flag alone blocks only when other signals add at least this much score
+  # (a provider's proxy vote, reverse DNS, join heuristics). Ordinary ISPs get tagged as
+  # hosting by single providers now and then. 0 blocks every hosting flag, as before.
+  hosting-min-score: 0.5
 
   # Check the downloaded IP lists below.
   use-lists: true
@@ -383,14 +388,16 @@ api:
       enabled: true
       weight: 1.0
 
+    # Flags nothing without a key in the public benchmark, so it only costs a request.
     ipquery:
-      enabled: true
+      enabled: false
       weight: 1.0
 
     # Also reports the connection type, which is what makes
-    # detection.allow-residential-hosting work well.
+    # detection.allow-residential-hosting work well. Without a key it answers with
+    # identification only and flags nothing, so it stays off until you add one.
     ipapi-is:
-      enabled: true
+      enabled: false
       weight: 1.5
       key: ""
 
@@ -400,7 +407,7 @@ api:
       key: ""
 
     freeipapi:
-      enabled: true
+      enabled: false
       weight: 1.0
 
     funkemunky:
@@ -429,7 +436,7 @@ api:
       weight: 1.0
 
     ip-check:
-      enabled: false
+      enabled: true
       weight: 1.0
 
     zowi:

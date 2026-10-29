@@ -190,8 +190,11 @@ public final class ProxyShieldCore {
     * protection comes from the on-disk cache anyway.
     */
    private void initialRefresh() {
+      // With a cached copy the server is already protected, so the download can wait for the
+      // startup rush. On a first start nothing is, so it begins at once.
+      long delaySeconds = lists.ranges().isEmpty() ? 0L : STARTUP_DELAY_SECONDS;
       try {
-         Thread.sleep(STARTUP_DELAY_SECONDS * 1000L);
+         Thread.sleep(delaySeconds * 1000L);
       } catch (InterruptedException interrupted) {
          Thread.currentThread().interrupt();
          return;
@@ -337,11 +340,26 @@ public final class ProxyShieldCore {
       if (!current.useLists()) {
          return false;
       }
+      // The network feed and the address lists come from different hosts, so they download side by
+      // side and the plugin is ready after the slower one instead of after both.
+      Thread asnWorker = null;
       if (current.asnEnabled()) {
-         asnFeed.refresh(current.asnSources(), current.listTimeoutSeconds());
+         asnWorker = new Thread(
+               () -> asnFeed.refresh(current.asnSources(), current.listTimeoutSeconds()),
+               "ProxyShield-asn-feed");
+         asnWorker.setDaemon(true);
+         asnWorker.start();
       }
-      return lists.refresh(current.activeListSources(), current.listTimeoutSeconds(),
+      boolean refreshed = lists.refresh(current.activeListSources(), current.listTimeoutSeconds(),
             current.listDiskCache());
+      if (asnWorker != null) {
+         try {
+            asnWorker.join();
+         } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+         }
+      }
+      return refreshed;
    }
 
    /**

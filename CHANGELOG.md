@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.0.1-BETA
+
+### Changed
+
+- **Faster first start.** Without a cached list the download begins at once instead of after an
+  8 second grace period, and the sources load side by side (at most three connections per host,
+  the network feed alongside). A fresh install is protected about a second after it enables
+  instead of 13.
+- **A hosting flag alone no longer blocks.** `detection.hosting-min-score` (default 0.5) asks for
+  at least that much score from other signals, so a provider tagging an ordinary ISP as hosting
+  does not refuse a real player. Set it to 0 to block every hosting flag as before.
+- **New default providers.** ip-check is on. ipapi.is (answers without flags when it has no key),
+  IPQuery and FreeIPAPI (flagged no proxy in a public benchmark) are off, which saves requests.
+  Existing configs keep their settings.
+
 ## 3.0.0
 
 ### Added

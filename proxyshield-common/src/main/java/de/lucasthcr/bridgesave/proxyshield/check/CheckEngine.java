@@ -194,7 +194,7 @@ public final class CheckEngine {
       }
 
       if (useProviderFlags && config.blockHosting() && result.hosting()
-            && !exemptHosting(result)) {
+            && !exemptHosting(result) && score >= config.hostingMinScore()) {
          return CheckVerdict.deny(CheckVerdict.Reason.HOSTING, detailFor(result, signals, score),
                withSignals(result, score, signals));
       }

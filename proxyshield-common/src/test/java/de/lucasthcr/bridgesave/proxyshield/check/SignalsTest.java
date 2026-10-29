@@ -140,6 +140,7 @@ class SignalsTest {
       void theExemptionCanBeTurnedOff() throws IOException {
          Map<String, Object> values = baseConfig();
          values.put("detection.allow-residential-hosting", false);
+         values.put("detection.hosting-min-score", 0.0);
 
          CheckVerdict verdict = engine(values, answering(false, true, "AS3320", "mobile"),
                null, null)
