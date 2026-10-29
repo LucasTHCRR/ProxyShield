@@ -204,14 +204,17 @@ public final class ProviderCatalog {
             .rateLimit(60)
             .build());
 
-      put(catalog, ProviderDefinition.builder("zowi", "https://api.zowi.gay/{ip}?key={key}")
+      // feature=security returns only the verdict fields, which is all that is read here. Free
+      // for 150 requests a minute per address (x-ratelimit-limit), so 120 leaves some headroom.
+      put(catalog, ProviderDefinition.builder("zowi",
+                  "https://api.zowi.gay/{ip}?feature=security&key={key}")
             .optionalKey()
-            .proxy("security.vpn.detected", "security.proxy",
+            .proxy("security.vpn.detected", "security.proxy.detected",
                   "security.residential_proxy.detected")
             .hosting("security.hosting")
-            .country("location.country_code")
+            .tor("security.tor")
             .weight(1.5)
-            .rateLimit(60)
+            .rateLimit(120)
             .build());
 
       // ---------------------------------------------------------------- key needed

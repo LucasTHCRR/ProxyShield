@@ -384,6 +384,13 @@ api:
     # The order is the order lookups use: the first api.first-wave providers are asked first.
     # Strongest keyless ones first, measured in the public benchmark.
 
+    # The strongest keyless service in the public benchmark. 150 requests a minute per address
+    # without a key, which is plenty with staged lookups. Run by Zowi (api.zowi.gay).
+    zowi:
+      enabled: true
+      weight: 1.5
+      key: ""
+
     # Proxy, VPN, Tor, cloud and Spamhaus data. Free and unlimited.
     blackbox:
       enabled: true
@@ -449,11 +456,6 @@ api:
     marvinmc:
       enabled: false
       weight: 1.0
-
-    zowi:
-      enabled: false
-      weight: 1.5
-      key: ""
 
     # ---- key required (or much better with one) ----
 

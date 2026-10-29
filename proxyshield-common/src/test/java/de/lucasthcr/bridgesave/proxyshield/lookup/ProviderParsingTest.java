@@ -287,7 +287,7 @@ class ProviderParsingTest {
                ProviderCatalog.byId("iplocate").url(IP));
          assertEquals("https://api.ipapi.is/?q=" + IP,
                ProviderCatalog.byId("ipapi-is").url(IP));
-         assertEquals("https://api.zowi.gay/" + IP,
+         assertEquals("https://api.zowi.gay/" + IP + "?feature=security",
                ProviderCatalog.byId("zowi").url(IP));
          assertEquals("https://proxycheck.io/v2/" + IP + "?vpn=1&asn=1&risk=1",
                ProviderCatalog.byId("proxycheck").url(IP));
@@ -326,6 +326,45 @@ class ProviderParsingTest {
          assertEquals(null, LookupResult.normalizeAsn("unknown"));
          assertEquals(null, LookupResult.normalizeAsn(""));
          assertEquals(null, LookupResult.normalizeAsn(null));
+      }
+   }
+
+   @Nested
+   @DisplayName("Zowi")
+   class Zowi {
+
+      private static final String FLAGGED = """
+            {"ip":"203.0.113.9","malicious":true,"security":{"bogon":false,
+             "vpn":{"detected":true,"source":"IVPN"},"proxy":{"detected":false},"hosting":true,
+             "residential_proxy":{"detected":false,"message":"Unblock this tool for $1.99 USD."},
+             "tor":false,"abuser":{"detected":false},"crawler":{"detected":false},
+             "suspicious":false},"rateLimit":{"limit":150,"remaining":148}}""";
+
+      private static final String CLEAN = """
+            {"ip":"203.0.113.10","malicious":false,"security":{"bogon":false,
+             "vpn":{"detected":false},"proxy":{"detected":false},"hosting":false,
+             "residential_proxy":{"detected":false},"tor":false,"abuser":{"detected":false},
+             "crawler":{"detected":false},"suspicious":false},"rateLimit":{"limit":150,"remaining":149}}""";
+
+      @Test
+      @DisplayName("A VPN answer from feature=security is read as VPN and hosting")
+      void readsAVpn() {
+         LookupResult result = parse("zowi", FLAGGED);
+
+         assertTrue(result.resolved());
+         assertTrue(result.proxy());
+         assertTrue(result.hosting());
+         assertFalse(result.tor());
+      }
+
+      @Test
+      @DisplayName("A clean answer flags nothing")
+      void readsAClean() {
+         LookupResult result = parse("zowi", CLEAN);
+
+         assertTrue(result.resolved());
+         assertFalse(result.proxy());
+         assertFalse(result.hosting());
       }
    }
 }

@@ -17,6 +17,10 @@
   being asked and failing. An ordinary address costs two requests instead of five, so the free
   quotas serve about twice as many new addresses. The default provider order puts the strongest
   keyless ones first (blackbox, ip-check, iplocate, ip-api, iprisk).
+- **Zowi's service is on by default, first in the list.** It was the strongest keyless provider in
+  the public benchmark. The request uses `feature=security`, so only the verdict fields come back,
+  and the provider limit is 120 a minute against the 150 the service allows per address. Existing
+  configs keep their settings.
 - **Faster first start.** Without a cached list the download begins at once instead of after an
   8 second grace period, and the sources load side by side (at most three connections per host,
   the network feed alongside). A fresh install is protected about a second after it enables
