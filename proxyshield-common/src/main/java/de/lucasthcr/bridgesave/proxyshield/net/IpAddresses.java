@@ -236,7 +236,27 @@ public final class IpAddresses {
          text = text.substring(0, text.length() - 1).trim();
       }
 
+      // Proxy lists ship "socks5://1.2.3.4:1080" or "1.2.3.4:8080": the address is what matters.
+      int scheme = text.indexOf("://");
+      if (scheme > 0 && scheme <= 10) {
+         text = text.substring(scheme + 3);
+      }
+      text = withoutPort(text);
+
       return text.isEmpty() ? null : text;
+   }
+
+   private static String withoutPort(String text) {
+      if (text.startsWith("[")) {
+         int close = text.indexOf("]:");
+         return close > 0 ? text.substring(1, close) : text;
+      }
+      int colon = text.indexOf(':');
+      if (colon > 0 && colon == text.lastIndexOf(':') && text.indexOf('.') > 0
+            && text.indexOf('.') < colon && text.substring(colon + 1).chars().allMatch(Character::isDigit)) {
+         return text.substring(0, colon);
+      }
+      return text;
    }
 
    private static int indexOfWhitespace(String text) {

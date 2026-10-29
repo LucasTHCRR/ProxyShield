@@ -301,6 +301,10 @@ lists:
     - "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/datacenter/ipv4.txt"
     - "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/datacenter/ipv6.txt"
     - "https://check.torproject.org/torbulkexitlist"
+    # Open proxies, checked every hour (MIT). Entries come as "socks5://1.2.3.4:1080", the
+    # address is what counts. proxifly's list is much bigger and not verified, so it is left
+    # out by default: "https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.txt"
+    - "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/all.txt"
     # Known bad hosts. Optional, but cheap - they are plain text lists.
     # - "https://lists.blocklist.de/lists/all.txt"
     # - "https://blocklist.greensnow.co/greensnow.txt"

@@ -91,4 +91,14 @@ class IpAddressesTest {
       assertNull(IpAddresses.normalizeListEntry("// whole line comment"));
       assertNull(IpAddresses.normalizeListEntry("   "));
    }
+
+   @Test
+   void readsProxyListEntries() {
+      assertEquals("1.2.3.4", IpAddresses.normalizeListEntry("socks5://1.2.3.4:1080"));
+      assertEquals("1.2.3.4", IpAddresses.normalizeListEntry("http://1.2.3.4:8080"));
+      assertEquals("1.2.3.4", IpAddresses.normalizeListEntry("1.2.3.4:3128"));
+      assertEquals("2001:db8::1", IpAddresses.normalizeListEntry("[2001:db8::1]:8080"));
+      assertEquals("2001:db8::1", IpAddresses.normalizeListEntry("2001:db8::1"));
+      assertEquals("1.2.3.0/24", IpAddresses.normalizeListEntry("1.2.3.0/24"));
+   }
 }

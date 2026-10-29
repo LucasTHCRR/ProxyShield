@@ -21,6 +21,10 @@
   the public benchmark. The request uses `feature=security`, so only the verdict fields come back,
   and the provider limit is 120 a minute against the 150 the service allows per address. Existing
   configs keep their settings.
+- **Open proxies are blocked from a list.** monosans/proxy-list (MIT, rebuilt hourly, about 1,300
+  addresses) is a default list source. List entries may now be `socks5://1.2.3.4:1080`,
+  `1.2.3.4:8080` or `[2001:db8::1]:8080`, only the address counts. proxifly's much larger,
+  unverified list is in the config as a commented option.
 - **Faster first start.** Without a cached list the download begins at once instead of after an
   8 second grace period, and the sources load side by side (at most three connections per host,
   the network feed alongside). A fresh install is protected about a second after it enables
