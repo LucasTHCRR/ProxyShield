@@ -25,6 +25,11 @@
   addresses) is a default list source. List entries may now be `socks5://1.2.3.4:1080`,
   `1.2.3.4:8080` or `[2001:db8::1]:8080`, only the address counts. proxifly's much larger,
   unverified list is in the config as a commented option.
+- **Offline network data.** `detection.network-data.source` takes the URL of a feed file that marks
+  end-user networks and hosting-like ones. It is read from disk, so a lookup costs no request.
+  Two uses, both set under the same key: `fallback-block-hosting` (on) refuses a hosting-like
+  network when no provider could answer, and `fast-admit-end-user` (off) skips the provider lookup
+  for end-user networks and keeps the quota for the rest. The source is empty by default.
 - **Faster first start.** Without a cached list the download begins at once instead of after an
   8 second grace period, and the sources load side by side (at most three connections per host,
   the network feed alongside). A fresh install is protected about a second after it enables

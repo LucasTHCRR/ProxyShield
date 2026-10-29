@@ -49,6 +49,17 @@ detection:
   # hosting by single providers now and then. 0 blocks every hosting flag, as before.
   hosting-min-score: 0.5
 
+  # Offline knowledge about networks, read from a feed file so it costs no request per player.
+  # The feed marks end-user networks (E) and hosting-like ones (H). Empty source = off.
+  network-data:
+    source: ""
+    # When no provider could answer (quota used up, outage), refuse hosting-like networks
+    # instead of letting the player in unchecked.
+    fallback-block-hosting: true
+    # Skip the provider lookup for addresses in end-user networks and keep the quota for the rest.
+    # Faster under load, but a proxy on a home connection is no longer asked about.
+    fast-admit-end-user: false
+
   # Check the downloaded IP lists below.
   use-lists: true
 

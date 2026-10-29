@@ -24,6 +24,7 @@ import de.lucasthcr.bridgesave.proxyshield.lookup.LookupProvider;
 import de.lucasthcr.bridgesave.proxyshield.lookup.LookupResult;
 import de.lucasthcr.bridgesave.proxyshield.net.IpAddresses;
 import de.lucasthcr.bridgesave.proxyshield.net.ManagedIpList;
+import de.lucasthcr.bridgesave.proxyshield.net.NetworkData;
 import de.lucasthcr.bridgesave.proxyshield.net.ReverseDns;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -66,6 +67,7 @@ public final class CheckEngine {
    private final TrustStore trust;
    private final JoinHeuristics heuristics;
    private volatile Predicate<String> listedAsn = asn -> false;
+   private volatile NetworkData networks;
 
    public CheckEngine(ShieldConfig config, ListManager lists, LookupProvider lookups,
          ManagedIpList whitelist, ManagedIpList blacklist) {
@@ -83,6 +85,12 @@ public final class CheckEngine {
       this.reverseDns = reverseDns;
       this.trust = trust;
       this.heuristics = heuristics;
+   }
+
+   /** Supplies offline knowledge about which kind of network an address is in. */
+   public CheckEngine withNetworkData(NetworkData data) {
+      this.networks = data;
+      return this;
    }
 
    /** Supplies networks blocked by a downloaded list, on top of {@code detection.asn.blocked}. */
@@ -143,7 +151,16 @@ public final class CheckEngine {
       }
 
       boolean needsLookup = config.useApi() || config.countryEnabled();
-      LookupResult result = needsLookup ? lookups.lookup(ip) : LookupResult.UNKNOWN;
+      NetworkData.Network network = networks != null && networks.loaded() ? networks.classify(ip) : null;
+      LookupResult result;
+      if (needsLookup && network != null && network.endUser() && config.networkFastAdmit()) {
+         // An end-user network with nothing against it: save the providers' quota for addresses
+         // that need it. The feed still supplies country and network number for the later rules.
+         result = LookupResult.of(false, false, false, network.country(), null, null,
+               network.asnName(), null, 0.0, List.of());
+      } else {
+         result = needsLookup ? lookups.lookup(ip) : LookupResult.UNKNOWN;
+      }
 
       if (needsLookup && !result.resolved()) {
          // Local signals still have something to say when every provider is unreachable, so the
@@ -151,6 +168,10 @@ public final class CheckEngine {
          CheckVerdict local = localSignalsOnly(uuid, ip, result);
          if (local != null) {
             return local;
+         }
+         if (network != null && network.hosting() && config.networkFallbackHosting()) {
+            return CheckVerdict.deny(CheckVerdict.Reason.HOSTING,
+                  "hosting network " + network.asnName() + " (no provider answered)", result);
          }
          if (config.failClosed()) {
             return CheckVerdict.deny(CheckVerdict.Reason.LOOKUP_FAILED, result.failureReason(),

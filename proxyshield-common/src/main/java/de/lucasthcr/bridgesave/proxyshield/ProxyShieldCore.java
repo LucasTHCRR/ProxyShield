@@ -31,6 +31,7 @@ import de.lucasthcr.bridgesave.proxyshield.list.ListManager;
 import de.lucasthcr.bridgesave.proxyshield.lookup.LookupResult;
 import de.lucasthcr.bridgesave.proxyshield.message.Messages;
 import de.lucasthcr.bridgesave.proxyshield.lookup.FailoverLookupService;
+import de.lucasthcr.bridgesave.proxyshield.net.NetworkData;
 import de.lucasthcr.bridgesave.proxyshield.net.ManagedIpList;
 import de.lucasthcr.bridgesave.proxyshield.net.ReverseDns;
 import de.lucasthcr.bridgesave.proxyshield.notify.AlertDispatcher;
@@ -73,6 +74,7 @@ public final class ProxyShieldCore {
    private final ConnectionLimiter limiter = new ConnectionLimiter();
    private final AltTracker alts;
    private final AsnFeed asnFeed;
+   private final NetworkData networks;
    private final Set<UUID> restricted = ConcurrentHashMap.newKeySet();
 
    private volatile ShieldConfig config;
@@ -94,6 +96,7 @@ public final class ProxyShieldCore {
       this.blacklist = new ManagedIpList(platform.dataFolder().resolve("blacklist.txt"));
       this.alts = new AltTracker(platform.dataFolder().resolve("alts.tsv"));
       this.asnFeed = new AsnFeed(platform);
+      this.networks = new NetworkData(platform);
    }
 
    /** Reads the config, restores caches and starts the background work. */
@@ -120,6 +123,7 @@ public final class ProxyShieldCore {
       trust.load();
       alts.load();
       asnFeed.loadFromDisk();
+      networks.loadFromDisk();
 
       if (storage.shared()) {
          platform.info("Verdicts and trust are shared through " + storage.name()
@@ -221,7 +225,7 @@ public final class ProxyShieldCore {
 
    private void rebuildEngine() {
       engine = new CheckEngine(config, lists, lookups, whitelist, blacklist, reverseDns, trust,
-            heuristics).withAsnFeed(asnFeed::contains);
+            heuristics).withAsnFeed(asnFeed::contains).withNetworkData(networks);
    }
 
    /** Re-reads config.yml and rebuilds everything derived from it. */
@@ -350,8 +354,23 @@ public final class ProxyShieldCore {
          asnWorker.setDaemon(true);
          asnWorker.start();
       }
+      Thread networkWorker = null;
+      if (!current.networkDataSource().isEmpty()) {
+         networkWorker = new Thread(
+               () -> networks.refresh(current.networkDataSource(), current.listTimeoutSeconds()),
+               "ProxyShield-network-feed");
+         networkWorker.setDaemon(true);
+         networkWorker.start();
+      }
       boolean refreshed = lists.refresh(current.activeListSources(), current.listTimeoutSeconds(),
             current.listDiskCache());
+      if (networkWorker != null) {
+         try {
+            networkWorker.join();
+         } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+         }
+      }
       if (asnWorker != null) {
          try {
             asnWorker.join();
@@ -509,6 +528,10 @@ public final class ProxyShieldCore {
 
    public Statistics statistics() {
       return statistics;
+   }
+
+   public NetworkData networkData() {
+      return networks;
    }
 
    public AsnFeed asnFeed() {

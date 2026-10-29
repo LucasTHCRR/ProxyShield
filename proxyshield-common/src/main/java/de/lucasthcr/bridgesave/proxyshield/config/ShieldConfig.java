@@ -142,6 +142,9 @@ public final class ShieldConfig {
    private final boolean blockTor;
    private final boolean allowResidentialHosting;
    private final double hostingMinScore;
+   private final String networkDataSource;
+   private final boolean networkFallbackHosting;
+   private final boolean networkFastAdmit;
    private final boolean asnEnabled;
    private final Set<String> blockedAsns;
    private final Set<String> allowedAsns;
@@ -293,6 +296,9 @@ public final class ShieldConfig {
       this.allowResidentialHosting =
             node.getBoolean("detection.allow-residential-hosting", true);
       this.hostingMinScore = Math.max(0.0, node.getDouble("detection.hosting-min-score", 0.5));
+      this.networkDataSource = node.getString("detection.network-data.source", "").trim();
+      this.networkFallbackHosting = node.getBoolean("detection.network-data.fallback-block-hosting", true);
+      this.networkFastAdmit = node.getBoolean("detection.network-data.fast-admit-end-user", false);
       this.asnEnabled = node.getBoolean("detection.asn.enabled", true);
       this.blockedAsns = normalizedAsns(node.getStringList("detection.asn.blocked"));
       this.allowedAsns = normalizedAsns(node.getStringList("detection.asn.allowed"));
@@ -895,6 +901,21 @@ public final class ShieldConfig {
 
    public boolean blockTor() {
       return blockTor;
+   }
+
+   /** URL of the network feed, empty when the feature is off. */
+   public String networkDataSource() {
+      return networkDataSource;
+   }
+
+   /** Refuse hosting-like networks when no provider could answer. */
+   public boolean networkFallbackHosting() {
+      return networkFallbackHosting;
+   }
+
+   /** Skip provider lookups for addresses in end-user networks. */
+   public boolean networkFastAdmit() {
+      return networkFastAdmit;
    }
 
    /** Score a hosting flag needs from other signals before it blocks. */
