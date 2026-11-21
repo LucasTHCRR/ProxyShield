@@ -169,9 +169,11 @@ public final class CheckEngine {
          if (local != null) {
             return local;
          }
-         if (network != null && network.hosting() && config.networkFallbackHosting()) {
+         if (network != null && (network.hosting() || network.noUsers())
+               && config.networkFallbackHosting()) {
             return CheckVerdict.deny(CheckVerdict.Reason.HOSTING,
-                  "hosting network " + network.asnName() + " (no provider answered)", result);
+                  (network.hosting() ? "hosting network " : "network without end users ")
+                        + network.asnName() + " (no provider answered)", result);
          }
          if (config.failClosed()) {
             return CheckVerdict.deny(CheckVerdict.Reason.LOOKUP_FAILED, result.failureReason(),

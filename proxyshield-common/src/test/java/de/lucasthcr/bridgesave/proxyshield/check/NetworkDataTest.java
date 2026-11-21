@@ -61,6 +61,8 @@ class NetworkDataTest {
       String lines = "# test feed\n"
             + "3405803776\t3405804031\tE\tDE\t3320\t4\n"
             + "3325256704\t3325256959\tH\tUS\t24940\t4\n"
+            + "151587072\t151587087\tN\tBG\t201899\t4\n"
+            + "151587088\t151587103\tS\tNL\t9009\t4\n"
             + "42540766411282592856903984951653826560\t42540766411283801782723599580828532735\tE\tDE\t3320\t6\n";
       try (OutputStream out = new GZIPOutputStream(Files.newOutputStream(cache.resolve("network-feed.tsv.gz")))) {
          out.write(lines.getBytes(StandardCharsets.UTF_8));
@@ -136,6 +138,24 @@ class NetworkDataTest {
 
       assertTrue(verdict.blocked());
       assertEquals(CheckVerdict.Reason.HOSTING, verdict.reason());
+   }
+
+   @Test
+   @DisplayName("A network without any end users is refused when no provider could answer, a small access network is not")
+   void noUsersFallback() throws IOException {
+      NetworkData data = feed();
+      CheckEngine engine = engine(data, ip -> LookupResult.failed("quota"), false);
+
+      assertTrue(data.classify("9.9.9.5").noUsers());
+      assertFalse(data.classify("9.9.9.20").noUsers());
+      assertFalse(data.classify("9.9.9.20").endUser());
+      assertFalse(data.classify("9.9.9.20").hosting());
+      assertEquals("NL", data.classify("9.9.9.20").country());
+
+      CheckVerdict verdict = engine.check("Steve", null, "9.9.9.5", permission -> false);
+      assertTrue(verdict.blocked());
+      assertTrue(verdict.detail().contains("without end users"), verdict.detail());
+      assertFalse(engine.check("Steve", null, "9.9.9.20", permission -> false).blocked());
    }
 
    @Test

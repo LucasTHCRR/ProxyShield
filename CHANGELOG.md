@@ -20,6 +20,9 @@
 
 - **The network feed is on by default** for new installs: `detection.network-data.source` points at
   the feed of the service. Existing configs keep their value.
+- **The feed covers every announced range** and has two more classes: `N` for networks where
+  nobody was measured at all and `S` for small access networks. `fallback-block-hosting` now also
+  refuses an `N` network when no provider could answer. `S` is only used for country and ASN.
 
 ## 3.0.2-RELEASE
 

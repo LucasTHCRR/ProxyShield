@@ -40,8 +40,10 @@ import java.util.zip.GZIPInputStream;
  * <p>
  * The feed is tab separated, one range per line: start, end, class, country, ASN, IP version.
  * Class {@code E} marks a network that serves many end users, {@code H} one that looks like
- * hosting. Ranges that are neither are not in the file. Both address families are held as sorted
- * arrays and searched by bisection, so a lookup costs microseconds.
+ * hosting, {@code N} one with no measured end users at all. Any other letter (the feed also has
+ * {@code S} for small access networks) is known to be neither and only supplies country and ASN.
+ * Both address families are held as sorted arrays and searched by bisection, so a lookup costs
+ * microseconds.
  * <p>
  * The last good download stays on disk, so a feed that is briefly unreachable changes nothing and
  * protection is in place from the first login after a restart.
@@ -49,7 +51,7 @@ import java.util.zip.GZIPInputStream;
 public final class NetworkData {
 
    /** What the feed knows about one address. */
-   public record Network(boolean endUser, boolean hosting, String country, long asn) {
+   public record Network(boolean endUser, boolean hosting, boolean noUsers, String country, long asn) {
 
       public String asnName() {
          return "AS" + asn;
@@ -61,7 +63,7 @@ public final class NetworkData {
    private static final class Table {
       final BigInteger[] starts;
       final BigInteger[] ends;
-      final boolean[] endUser;
+      final char[] kind;
       final String[] country;
       final long[] asn;
 
@@ -69,14 +71,14 @@ public final class NetworkData {
          int size = rows.size();
          starts = new BigInteger[size];
          ends = new BigInteger[size];
-         endUser = new boolean[size];
+         kind = new char[size];
          country = new String[size];
          asn = new long[size];
          for (int i = 0; i < size; i++) {
             Object[] row = rows.get(i);
             starts[i] = (BigInteger) row[0];
             ends[i] = (BigInteger) row[1];
-            endUser[i] = (boolean) row[2];
+            kind[i] = (char) row[2];
             country[i] = (String) row[3];
             asn[i] = (long) row[4];
          }
@@ -90,7 +92,8 @@ public final class NetworkData {
          if (index < 0 || ends[index].compareTo(value) < 0) {
             return null;
          }
-         return new Network(endUser[index], !endUser[index], country[index], asn[index]);
+         return new Network(kind[index] == 'E', kind[index] == 'H', kind[index] == 'N', country[index],
+               asn[index]);
       }
    }
 
@@ -212,7 +215,10 @@ public final class NetworkData {
             if (parts.length < 6) {
                continue;
             }
-            Object[] row = {new BigInteger(parts[0]), new BigInteger(parts[1]), parts[2].equals("E"),
+            if (parts[2].isEmpty()) {
+               continue;
+            }
+            Object[] row = {new BigInteger(parts[0]), new BigInteger(parts[1]), parts[2].charAt(0),
                   parts[3], Long.parseLong(parts[4])};
             ("6".equals(parts[5]) ? six : four).add(row);
          }
