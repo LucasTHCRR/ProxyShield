@@ -35,6 +35,7 @@ import de.lucasthcr.bridgesave.proxyshield.net.NetworkData;
 import de.lucasthcr.bridgesave.proxyshield.net.ManagedIpList;
 import de.lucasthcr.bridgesave.proxyshield.net.ReverseDns;
 import de.lucasthcr.bridgesave.proxyshield.notify.AlertDispatcher;
+import de.lucasthcr.bridgesave.proxyshield.report.SightingReporter;
 import de.lucasthcr.bridgesave.proxyshield.notify.CommandActions;
 import de.lucasthcr.bridgesave.proxyshield.notify.DiscordWebhook;
 import de.lucasthcr.bridgesave.proxyshield.platform.Platform;
@@ -75,6 +76,7 @@ public final class ProxyShieldCore {
    private final AltTracker alts;
    private final AsnFeed asnFeed;
    private final NetworkData networks;
+   private final SightingReporter reporter;
    private final Set<UUID> restricted = ConcurrentHashMap.newKeySet();
 
    private volatile ShieldConfig config;
@@ -97,6 +99,7 @@ public final class ProxyShieldCore {
       this.alts = new AltTracker(platform.dataFolder().resolve("alts.tsv"));
       this.asnFeed = new AsnFeed(platform);
       this.networks = new NetworkData(platform);
+      this.reporter = new SightingReporter(platform, () -> config);
    }
 
    /** Reads the config, restores caches and starts the background work. */
@@ -147,6 +150,8 @@ public final class ProxyShieldCore {
       lists.loadFromDisk(config.activeListSources());
       platform.runAsync(this::initialRefresh);
       platform.runAsyncTimer(this::heartbeat, HEARTBEAT_SECONDS);
+      platform.runAsyncTimer(reporter::tick, 60);
+      announceReporting(config);
 
       ProxyShieldApi.bind(this);
       platform.info("ProxyShield " + platform.version() + " enabled on " + platform.name() + ".");
@@ -257,6 +262,7 @@ public final class ProxyShieldCore {
 
       webhook.applyConfig(updated);
       alerts.applyConfig(updated, messages);
+      announceReporting(updated);
       whitelist.setConfigEntries(updated.whitelistIps());
       blacklist.setConfigEntries(updated.blacklistIps());
       rebuildEngine();
@@ -299,6 +305,7 @@ public final class ProxyShieldCore {
 
          if (verdict.blocked()) {
             alerts.alert(player.name(), player.uuid(), ip, verdict, enforced);
+            reporter.offer(ip, verdict);
             if (enforced) {
                player.kick(kickMessage(verdict, player.name(), ip));
                disconnected++;
@@ -424,6 +431,7 @@ public final class ProxyShieldCore {
 
       if (verdict.blocked()) {
          alerts.alert(playerName, uuid, ip, verdict, enforced);
+         reporter.offer(ip, verdict);
          // An account caught behind a proxy starts earning its exemption again from scratch.
          trust.forget(uuid);
       } else if (current.trustEnabled()
@@ -528,6 +536,18 @@ public final class ProxyShieldCore {
 
    public Statistics statistics() {
       return statistics;
+   }
+
+   public SightingReporter reporter() {
+      return reporter;
+   }
+
+   private void announceReporting(ShieldConfig current) {
+      if (current.reportingEnabled()) {
+         platform.info("Reporting is on: addresses refused as proxies are sent to " + current.reportingUrl()
+               + " (no names, no UUIDs). Turn it off with reporting.enabled, delete what was sent with"
+               + " /proxyshield reporting forget.");
+      }
    }
 
    public NetworkData networkData() {

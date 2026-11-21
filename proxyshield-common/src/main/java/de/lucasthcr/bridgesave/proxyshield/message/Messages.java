@@ -242,6 +242,12 @@ public final class Messages {
       m.put("list-save-failed", "{prefix}&cCould not save the {list}: &f{error}");
       m.put("list-usage", "{prefix}&cUsage: &f/proxyshield {list} <add|remove|info|list|purge> [ip|player] [30m|12h|7d] [reason]");
 
+      m.put("reporting-on", "{prefix}&aReporting is on &8(&f{url}&8)&a. Queued: &f{queued}&a, sent: &f{sent}&a, last error: &f{error}&a. Delete what was sent with &f/proxyshield reporting forget&a.");
+      m.put("reporting-off", "{prefix}&7Reporting is off. Switch it on with &freporting.enabled&7 in the config.");
+      m.put("reporting-forgotten", "{prefix}&aThe service deleted &f{count} &areported address(es) and this server forgot its install id.");
+      m.put("reporting-nothing", "{prefix}&7This server never reported anything, so there is nothing to delete.");
+      m.put("reporting-failed", "{prefix}&cThe service could not be reached. Nothing was deleted, try again later.");
+      m.put("help-reporting", "&e/proxyshield reporting [forget] &8- &7Reporting status, or delete what was sent");
       m.put("usage-check", "{prefix}&cUsage: &f/proxyshield check <player|ip>");
       m.put("usage-lookup", "{prefix}&cUsage: &f/proxyshield lookup <player|ip>");
 

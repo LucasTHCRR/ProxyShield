@@ -54,7 +54,7 @@ public final class CommandHandler {
 
    private static final List<String> SUBCOMMANDS = List.of(
          "help", "info", "providers", "reload", "stats", "check", "lookup", "refresh", "recheck",
-         "whitelist", "blacklist", "alts", "clearcache", "dryrun", "silent");
+         "whitelist", "blacklist", "alts", "clearcache", "dryrun", "silent", "reporting");
 
    private static final List<String> LIST_ACTIONS =
          List.of("add", "remove", "list", "info", "purge");
@@ -126,6 +126,7 @@ public final class CommandHandler {
          case "whitelist" -> doListCommand(sender, args, core.whitelist(), "whitelist");
          case "blacklist" -> doListCommand(sender, args, core.blacklist(), "blacklist");
          case "alts" -> doAlts(sender, args);
+         case "reporting" -> doReporting(sender, args);
          case "dryrun" -> sendToggleHint(sender, "detection.dry-run", core.config().dryRun());
          case "silent" -> sendToggleHint(sender, "notifications.silent", core.config().silent());
          default -> {
@@ -191,7 +192,7 @@ public final class CommandHandler {
       send(sender, "help-header", of("version", core.platform().version()));
       for (String key : List.of("help-info", "help-stats", "help-check", "help-lookup",
             "help-whitelist", "help-blacklist", "help-alts", "help-refresh", "help-recheck",
-            "help-clearcache", "help-reload", "help-footer")) {
+            "help-clearcache", "help-reporting", "help-reload", "help-footer")) {
          send(sender, key);
       }
    }
@@ -357,6 +358,28 @@ public final class CommandHandler {
             send(sender, "recheck-done", of("count", String.valueOf(disconnected)));
          }
       });
+   }
+
+   private void doReporting(Sender sender, String[] args) {
+      if (args.length >= 2 && args[1].equalsIgnoreCase("forget")) {
+         core.platform().runAsync(() -> {
+            int deleted = core.reporter().forget();
+            if (deleted == -2) {
+               send(sender, "reporting-nothing");
+            } else if (deleted < 0) {
+               send(sender, "reporting-failed");
+            } else {
+               send(sender, "reporting-forgotten", of("count", String.valueOf(deleted)));
+            }
+         });
+         return;
+      }
+      var status = core.reporter().status();
+      send(sender, status.enabled() ? "reporting-on" : "reporting-off", of(
+            "url", status.url(),
+            "queued", String.valueOf(status.queued()),
+            "sent", String.valueOf(status.sent()),
+            "error", status.lastError().isEmpty() ? "none" : status.lastError()));
    }
 
    private void doClearCache(Sender sender) {

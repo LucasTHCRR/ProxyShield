@@ -204,6 +204,18 @@ public final class ProviderCatalog {
             .rateLimit(60)
             .build());
 
+      // PaperStream's own service: network feed, public lists and addresses other ProxyShield
+      // servers reported. No key, 600 requests a minute per address, so 500 leaves headroom.
+      put(catalog, ProviderDefinition.builder("paperstream", "https://intel.paperstream.dev/v1/ip/{ip}")
+            .proxy("vpn", "proxy", "community")
+            .hosting("hosting")
+            .tor("tor")
+            .country("country")
+            .asn("asn")
+            .weight(1.0)
+            .rateLimit(500)
+            .build());
+
       // feature=security returns only the verdict fields, which is all that is read here. Free
       // for 150 requests a minute per address (x-ratelimit-limit), so 120 leaves some headroom.
       put(catalog, ProviderDefinition.builder("zowi",

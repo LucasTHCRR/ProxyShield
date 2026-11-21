@@ -1,5 +1,26 @@
 # Changelog
 
+## 3.1.0-BETA
+
+### Added
+
+- **PaperStream intel service as a provider.** `paperstream` is a new default provider, first in
+  the list. It answers from a daily built network feed, the public VPN, datacenter, Tor and proxy
+  lists and the addresses other ProxyShield servers reported. No key, 600 requests a minute per
+  address, open to everyone at intel.paperstream.dev. Existing configs keep their providers: add
+  the `paperstream` block from the new config.yml under `api.providers` to use it.
+- **Reporting, off by default.** With `reporting.enabled: true` the addresses refused as proxies
+  by the providers are sent to the service together with a random install id, in batches every 10
+  minutes. No player names, no UUIDs, no server address. The service keeps them for 14 days and
+  counts on how many servers an address showed up; from 3 servers it votes "proxy" for everybody.
+  `/proxyshield reporting` shows the state, `/proxyshield reporting forget` deletes everything
+  sent so far and drops the install id.
+
+### Changed
+
+- **The network feed is on by default** for new installs: `detection.network-data.source` points at
+  the feed of the service. Existing configs keep their value.
+
 ## 3.0.2-RELEASE
 
 ### Fixed

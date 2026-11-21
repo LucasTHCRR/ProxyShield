@@ -367,4 +367,42 @@ class ProviderParsingTest {
          assertFalse(result.hosting());
       }
    }
+
+   @Nested
+   @DisplayName("paperstream")
+   class PaperStream {
+
+      private static final String CLEAN = "{\"ip\":\"80.187.100.44\",\"country\":\"DE\",\"asn\":3320,"
+            + "\"network\":\"end_user\",\"vpn\":false,\"proxy\":false,\"tor\":false,\"hosting\":false,"
+            + "\"seen_by\":0,\"community\":false}";
+      private static final String COMMUNITY = "{\"ip\":\"203.0.113.9\",\"country\":\"NL\",\"asn\":9009,"
+            + "\"network\":\"unknown\",\"vpn\":false,\"proxy\":false,\"tor\":false,\"hosting\":false,"
+            + "\"seen_by\":4,\"community\":true}";
+
+      @Test
+      @DisplayName("A clean answer flags nothing and carries country and ASN")
+      void readsAClean() {
+         LookupResult result = parse("paperstream", CLEAN);
+
+         assertTrue(result.resolved());
+         assertFalse(result.proxy());
+         assertFalse(result.hosting());
+         assertFalse(result.tor());
+         assertEquals("DE", result.countryCode());
+      }
+
+      @Test
+      @DisplayName("An address other servers reported counts as a proxy")
+      void readsTheCommunityVote() {
+         LookupResult result = parse("paperstream", COMMUNITY);
+
+         assertTrue(result.proxy());
+      }
+
+      @Test
+      @DisplayName("The request goes to the intel service without a key")
+      void urlHasNoKey() {
+         assertEquals("https://intel.paperstream.dev/v1/ip/" + IP, ProviderCatalog.byId("paperstream").url(IP));
+      }
+   }
 }

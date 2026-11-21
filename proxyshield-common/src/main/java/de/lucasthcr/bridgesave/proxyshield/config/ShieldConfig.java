@@ -143,6 +143,9 @@ public final class ShieldConfig {
    private final boolean allowResidentialHosting;
    private final double hostingMinScore;
    private final String networkDataSource;
+   private final boolean reportingEnabled;
+   private final String reportingUrl;
+   private final int reportingIntervalMinutes;
    private final boolean networkFallbackHosting;
    private final boolean networkFastAdmit;
    private final boolean asnEnabled;
@@ -297,6 +300,11 @@ public final class ShieldConfig {
             node.getBoolean("detection.allow-residential-hosting", true);
       this.hostingMinScore = Math.max(0.0, node.getDouble("detection.hosting-min-score", 0.5));
       this.networkDataSource = node.getString("detection.network-data.source", "").trim();
+      this.reportingEnabled = node.getBoolean("reporting.enabled", false);
+      String reportingTarget = node.getString("reporting.url", "https://intel.paperstream.dev").trim();
+      this.reportingUrl = reportingTarget.endsWith("/")
+            ? reportingTarget.substring(0, reportingTarget.length() - 1) : reportingTarget;
+      this.reportingIntervalMinutes = Math.max(1, Math.min(1440, node.getInt("reporting.interval-minutes", 10)));
       this.networkFallbackHosting = node.getBoolean("detection.network-data.fallback-block-hosting", true);
       this.networkFastAdmit = node.getBoolean("detection.network-data.fast-admit-end-user", false);
       this.asnEnabled = node.getBoolean("detection.asn.enabled", true);
@@ -901,6 +909,19 @@ public final class ShieldConfig {
 
    public boolean blockTor() {
       return blockTor;
+   }
+
+   /** Whether refused proxy addresses are sent to the intel service. Off unless switched on. */
+   public boolean reportingEnabled() {
+      return reportingEnabled;
+   }
+
+   public String reportingUrl() {
+      return reportingUrl;
+   }
+
+   public int reportingIntervalMinutes() {
+      return reportingIntervalMinutes;
    }
 
    /** URL of the network feed, empty when the feature is off. */

@@ -1,5 +1,5 @@
 # ============================================================================
-#  ProxyShield v3.0.2-RELEASE  -  Anti-VPN / Anti-Proxy
+#  ProxyShield v3.1.0-BETA  -  Anti-VPN / Anti-Proxy
 #  Paper - Folia - BungeeCord - Velocity - Sponge
 #
 #  Every option below behaves identically on all five platforms.
@@ -52,7 +52,7 @@ detection:
   # Offline knowledge about networks, read from a feed file so it costs no request per player.
   # The feed marks end-user networks (E) and hosting-like ones (H). Empty source = off.
   network-data:
-    source: ""
+    source: "https://intel.paperstream.dev/feed/asn-feed.tsv.gz"
     # When no provider could answer (quota used up, outage), refuse hosting-like networks
     # instead of letting the player in unchecked.
     fallback-block-hosting: true
@@ -399,6 +399,12 @@ api:
     # The order is the order lookups use: the first api.first-wave providers are asked first.
     # Strongest keyless ones first, measured in the public benchmark.
 
+    # PaperStream's own service: network feed, public lists and the addresses other ProxyShield
+    # servers reported. No key, 600 requests a minute per address.
+    paperstream:
+      enabled: true
+      weight: 1.0
+
     # The strongest keyless service in the public benchmark. 150 requests a minute per address
     # without a key, which is plenty with staged lookups. Run by Zowi (api.zowi.gay).
     zowi:
@@ -637,6 +643,22 @@ storage:
 
     # Key prefix, so several networks can share one Redis instance.
     prefix: "proxyshield:"
+
+# ============================================================================
+#  Reporting
+#
+#  OFF by default. When on, addresses that were refused as proxies or VPNs by the
+#  providers are sent to PaperStream's intel service together with a random install
+#  id. That lets other servers learn from them (the "community" vote). Sent: the
+#  address and the id, nothing else. No player names, no UUIDs, no server address.
+#  Kept for 14 days. /proxyshield reporting forget deletes everything sent so far.
+#  Details: https://paperstream.dev/datenschutz
+# ============================================================================
+reporting:
+  enabled: false
+  url: "https://intel.paperstream.dev"
+  # How often a batch is sent, in minutes (1 to 1440).
+  interval-minutes: 10
 
 # ============================================================================
 #  Metrics
