@@ -54,7 +54,7 @@ public final class CommandHandler {
 
    private static final List<String> SUBCOMMANDS = List.of(
          "help", "info", "providers", "reload", "stats", "check", "lookup", "refresh", "recheck",
-         "whitelist", "blacklist", "alts", "clearcache", "dryrun", "silent", "reporting");
+         "whitelist", "blacklist", "alts", "clearcache", "dryrun", "silent", "reporting", "update");
 
    private static final List<String> LIST_ACTIONS =
          List.of("add", "remove", "list", "info", "purge");
@@ -127,6 +127,7 @@ public final class CommandHandler {
          case "blacklist" -> doListCommand(sender, args, core.blacklist(), "blacklist");
          case "alts" -> doAlts(sender, args);
          case "reporting" -> doReporting(sender, args);
+         case "update" -> doUpdate(sender, args);
          case "dryrun" -> sendToggleHint(sender, "detection.dry-run", core.config().dryRun());
          case "silent" -> sendToggleHint(sender, "notifications.silent", core.config().silent());
          default -> {
@@ -192,7 +193,7 @@ public final class CommandHandler {
       send(sender, "help-header", of("version", core.platform().version()));
       for (String key : List.of("help-info", "help-stats", "help-check", "help-lookup",
             "help-whitelist", "help-blacklist", "help-alts", "help-refresh", "help-recheck",
-            "help-clearcache", "help-reporting", "help-reload", "help-footer")) {
+            "help-clearcache", "help-reporting", "help-update", "help-reload", "help-footer")) {
          send(sender, key);
       }
    }
@@ -356,6 +357,36 @@ public final class CommandHandler {
             send(sender, "recheck-dry-run");
          } else {
             send(sender, "recheck-done", of("count", String.valueOf(disconnected)));
+         }
+      });
+   }
+
+   private void doUpdate(Sender sender, String[] args) {
+      boolean install = args.length >= 2 && args[1].equalsIgnoreCase("install");
+      send(sender, "update-checking");
+      core.platform().runAsync(() -> {
+         try {
+            if (install) {
+               var staged = core.updates().stage();
+               switch (staged.status()) {
+                  case STAGED, ALREADY_STAGED -> send(sender, "update-staged", of("version", String.valueOf(staged.version())));
+                  case UP_TO_DATE -> send(sender, "update-latest", of("current", core.platform().version()));
+                  case DISABLED -> send(sender, "update-no-folder");
+                  default -> send(sender, "update-failed", of("error", String.valueOf(staged.detail())));
+               }
+               return;
+            }
+            var result = core.updates().checkNow();
+            if (result.updateAvailable()) {
+               send(sender, "update-found", of("version", result.best().versionNumber(),
+                     "current", core.platform().version(), "source", result.best().sourceName()));
+            } else if (result.found()) {
+               send(sender, "update-latest", of("current", core.platform().version()));
+            } else {
+               send(sender, "update-failed", of("error", "no source answered"));
+            }
+         } catch (RuntimeException failure) {
+            send(sender, "update-failed", of("error", String.valueOf(failure.getMessage())));
          }
       });
    }

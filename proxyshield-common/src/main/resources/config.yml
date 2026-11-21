@@ -645,6 +645,20 @@ storage:
     prefix: "proxyshield:"
 
 # ============================================================================
+#  Updates
+#
+#  notify: tell the console when a newer ProxyShield is out. One small request
+#  every 12 hours to Modrinth, Hangar and Codeberg, nothing about your server
+#  is sent. auto-update: Paper, Folia and Spigot only. Downloads the new jar
+#  into the update folder (plugins/update), where the server applies it on the
+#  next restart. The running jar is never modified. OFF by default.
+#  /proxyshield update checks on demand, /proxyshield update install stages.
+# ============================================================================
+updates:
+  notify: true
+  auto-update: false
+
+# ============================================================================
 #  Reporting
 #
 #  OFF by default. When on, addresses that were refused as proxies or VPNs by the

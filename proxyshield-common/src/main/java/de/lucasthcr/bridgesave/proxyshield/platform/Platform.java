@@ -63,6 +63,11 @@ public interface Platform {
       return false;
    }
 
+   /** Where a new jar can be staged, empty on servers without an update folder. */
+   default java.util.Optional<UpdateTarget> updateTarget() {
+      return java.util.Optional.empty();
+   }
+
    /** Writes the bundled default config.yml if none exists yet. */
    default void saveDefaultConfig() {
       saveResource("config.yml");

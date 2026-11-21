@@ -15,6 +15,15 @@
     <description>Platform independent detection core.</description>
 
     <dependencies>
+        <!-- Update checks. Shaded and relocated by every platform jar; Gson comes with the server. -->
+        <dependency>
+            <groupId>dev.paperstream</groupId>
+            <artifactId>updater-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+        </dependency>
         <!--
           YamlConfigNode compiles against this; the platforms that use it shade their own copy.
           Provided scope is also on the test classpath, which is what lets the tests parse the

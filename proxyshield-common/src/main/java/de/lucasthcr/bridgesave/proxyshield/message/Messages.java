@@ -248,6 +248,13 @@ public final class Messages {
       m.put("reporting-nothing", "{prefix}&7This server never reported anything, so there is nothing to delete.");
       m.put("reporting-failed", "{prefix}&cThe service could not be reached. Nothing was deleted, try again later.");
       m.put("help-reporting", "&e/proxyshield reporting [forget] &8- &7Reporting status, or delete what was sent");
+      m.put("update-checking", "{prefix}&7Checking for updates...");
+      m.put("update-found", "{prefix}&aProxyShield &f{version} &ais out on {source}, this server runs &f{current}&a. On Paper, Folia and Spigot &f/proxyshield update install&a stages it.");
+      m.put("update-latest", "{prefix}&aProxyShield &f{current} &ais the newest version.");
+      m.put("update-staged", "{prefix}&aProxyShield &f{version} &ais in the update folder and takes effect on the next restart.");
+      m.put("update-no-folder", "{prefix}&7This platform has no update folder. Download the new jar from Modrinth, Hangar or Codeberg.");
+      m.put("update-failed", "{prefix}&cThe update check failed: &f{error}");
+      m.put("help-update", "&e/proxyshield update [install] &8- &7Check for a newer version, or stage it");
       m.put("usage-check", "{prefix}&cUsage: &f/proxyshield check <player|ip>");
       m.put("usage-lookup", "{prefix}&cUsage: &f/proxyshield lookup <player|ip>");
 

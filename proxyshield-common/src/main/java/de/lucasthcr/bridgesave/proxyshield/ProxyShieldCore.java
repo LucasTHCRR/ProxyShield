@@ -36,6 +36,7 @@ import de.lucasthcr.bridgesave.proxyshield.net.ManagedIpList;
 import de.lucasthcr.bridgesave.proxyshield.net.ReverseDns;
 import de.lucasthcr.bridgesave.proxyshield.notify.AlertDispatcher;
 import de.lucasthcr.bridgesave.proxyshield.report.SightingReporter;
+import de.lucasthcr.bridgesave.proxyshield.update.UpdateService;
 import de.lucasthcr.bridgesave.proxyshield.notify.CommandActions;
 import de.lucasthcr.bridgesave.proxyshield.notify.DiscordWebhook;
 import de.lucasthcr.bridgesave.proxyshield.platform.Platform;
@@ -77,6 +78,7 @@ public final class ProxyShieldCore {
    private final AsnFeed asnFeed;
    private final NetworkData networks;
    private final SightingReporter reporter;
+   private final UpdateService updates;
    private final Set<UUID> restricted = ConcurrentHashMap.newKeySet();
 
    private volatile ShieldConfig config;
@@ -100,6 +102,7 @@ public final class ProxyShieldCore {
       this.asnFeed = new AsnFeed(platform);
       this.networks = new NetworkData(platform);
       this.reporter = new SightingReporter(platform, () -> config);
+      this.updates = new UpdateService(platform, () -> config);
    }
 
    /** Reads the config, restores caches and starts the background work. */
@@ -151,6 +154,7 @@ public final class ProxyShieldCore {
       platform.runAsync(this::initialRefresh);
       platform.runAsyncTimer(this::heartbeat, HEARTBEAT_SECONDS);
       platform.runAsyncTimer(reporter::tick, 60);
+      platform.runAsyncTimer(updates::tick, 60);
       announceReporting(config);
 
       ProxyShieldApi.bind(this);
@@ -536,6 +540,10 @@ public final class ProxyShieldCore {
 
    public Statistics statistics() {
       return statistics;
+   }
+
+   public UpdateService updates() {
+      return updates;
    }
 
    public SightingReporter reporter() {

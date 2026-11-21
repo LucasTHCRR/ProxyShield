@@ -61,6 +61,18 @@ final class PaperPlatform implements Platform {
    }
 
    @Override
+   public java.util.Optional<de.lucasthcr.bridgesave.proxyshield.platform.UpdateTarget> updateTarget() {
+      try {
+         java.nio.file.Path jar = java.nio.file.Path.of(
+               plugin.getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
+         return java.util.Optional.of(new de.lucasthcr.bridgesave.proxyshield.platform.UpdateTarget(jar,
+               plugin.getServer().getUpdateFolderFile().toPath()));
+      } catch (java.net.URISyntaxException | RuntimeException failure) {
+         return java.util.Optional.empty();
+      }
+   }
+
+   @Override
    @SuppressWarnings("deprecation")
    public String version() {
       // getDescription() is deprecated on Paper but is the only variant Spigot has.

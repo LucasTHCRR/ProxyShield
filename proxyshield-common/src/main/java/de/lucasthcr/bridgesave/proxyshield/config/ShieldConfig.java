@@ -143,6 +143,8 @@ public final class ShieldConfig {
    private final boolean allowResidentialHosting;
    private final double hostingMinScore;
    private final String networkDataSource;
+   private final boolean updatesNotify;
+   private final boolean updatesAutoInstall;
    private final boolean reportingEnabled;
    private final String reportingUrl;
    private final int reportingIntervalMinutes;
@@ -300,6 +302,8 @@ public final class ShieldConfig {
             node.getBoolean("detection.allow-residential-hosting", true);
       this.hostingMinScore = Math.max(0.0, node.getDouble("detection.hosting-min-score", 0.5));
       this.networkDataSource = node.getString("detection.network-data.source", "").trim();
+      this.updatesNotify = node.getBoolean("updates.notify", true);
+      this.updatesAutoInstall = node.getBoolean("updates.auto-update", false);
       this.reportingEnabled = node.getBoolean("reporting.enabled", false);
       String reportingTarget = node.getString("reporting.url", "https://intel.paperstream.dev").trim();
       this.reportingUrl = reportingTarget.endsWith("/")
@@ -909,6 +913,16 @@ public final class ShieldConfig {
 
    public boolean blockTor() {
       return blockTor;
+   }
+
+   /** Whether the console is told about newer versions. */
+   public boolean updatesNotify() {
+      return updatesNotify;
+   }
+
+   /** Whether new versions are staged into the update folder on their own. Off unless switched on. */
+   public boolean updatesAutoInstall() {
+      return updatesAutoInstall;
    }
 
    /** Whether refused proxy addresses are sent to the intel service. Off unless switched on. */

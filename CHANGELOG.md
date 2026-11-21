@@ -16,6 +16,13 @@
   `/proxyshield reporting` shows the state, `/proxyshield reporting forget` deletes everything
   sent so far and drops the install id.
 
+- **Update checks.** The console is told when a newer ProxyShield is out (`updates.notify`, on by
+  default): one small request every 12 hours to Modrinth, Hangar and Codeberg, nothing about the
+  server is sent. `/proxyshield update` checks on demand. On Paper, Folia and Spigot,
+  `updates.auto-update` (off by default) or `/proxyshield update install` downloads the new jar into
+  the update folder, where the server applies it on the next restart; the running jar is never
+  touched. Built on the open updater-api library (Apache-2.0).
+
 ### Changed
 
 - **The network feed is on by default** for new installs: `detection.network-data.source` points at

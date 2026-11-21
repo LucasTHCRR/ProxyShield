@@ -51,6 +51,7 @@
                             <artifactSet>
                                 <includes>
                                     <include>de.lucasthcr.bridgesave:proxyshield-common</include>
+                                    <include>dev.paperstream:updater-api</include>
                                     <include>org.bstats:*</include>
                                 </includes>
                             </artifactSet>
@@ -59,6 +60,10 @@
                                   bStats requires relocation: two plugins shipping the same
                                   unrelocated copy fight over one class on a shared classpath.
                                 -->
+                                <relocation>
+                                    <pattern>de.empireblocks.updaterapi</pattern>
+                                    <shadedPattern>de.lucasthcr.bridgesave.proxyshield.libs.updater</shadedPattern>
+                                </relocation>
                                 <relocation>
                                     <pattern>org.bstats</pattern>
                                     <shadedPattern>de.lucasthcr.bridgesave.proxyshield.bstats</shadedPattern>
