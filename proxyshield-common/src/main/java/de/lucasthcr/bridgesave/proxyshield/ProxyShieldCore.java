@@ -25,6 +25,7 @@ import de.lucasthcr.bridgesave.proxyshield.check.CheckVerdict;
 import de.lucasthcr.bridgesave.proxyshield.check.ConnectionLimiter;
 import de.lucasthcr.bridgesave.proxyshield.check.JoinHeuristics;
 import de.lucasthcr.bridgesave.proxyshield.check.TrustStore;
+import de.lucasthcr.bridgesave.proxyshield.config.ConfigMigration;
 import de.lucasthcr.bridgesave.proxyshield.config.ShieldConfig;
 import de.lucasthcr.bridgesave.proxyshield.list.AsnFeed;
 import de.lucasthcr.bridgesave.proxyshield.list.ListManager;
@@ -108,6 +109,7 @@ public final class ProxyShieldCore {
    /** Reads the config, restores caches and starts the background work. */
    public void start() {
       platform.saveDefaultConfig();
+      ConfigMigration.run(platform);
       config = ShieldConfig.from(platform.loadConfig());
       config.warnings().forEach(platform::warn);
       messages = Messages.load(platform, config.language());

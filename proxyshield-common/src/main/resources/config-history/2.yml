@@ -1,0 +1,849 @@
+# ============================================================================
+#  ProxyShield v3.0.2-RELEASE  -  Anti-VPN / Anti-Proxy
+#  Paper - Folia - BungeeCord - Velocity - Sponge
+#
+#  Every option below behaves identically on all five platforms.
+#  After editing run:  /proxyshield reload
+# ============================================================================
+
+settings:
+  # Which message file to use. "en" loads messages_en.yml, "de" loads messages_de.yml.
+  # Both ship with the plugin. To add your own, copy one of them to messages_<code>.yml
+  # and point this at <code>. All player facing text lives in those files, not here.
+  language: "en"
+
+  # What to do when a check cannot complete (every provider down, rate limit, timeout).
+  #   false = let the player in  (recommended)
+  #   true  = deny the connection
+  fail-closed: false
+
+  # Players with this permission skip every check.
+  bypass-permission: "proxyshield.bypass"
+
+  # Print every provider answer to the console, raw body included. Useful for working
+  # out why an address was or was not flagged, and for writing conditions (see the
+  # "your own" provider example under api.providers). Leave off in normal operation.
+  debug: false
+
+detection:
+  # Detect and report, but never actually kick. Use this to hunt false positives
+  # before you switch enforcement on.
+  dry-run: false
+
+  # Block addresses that reach the required score for proxy, VPN or anonymising traffic.
+  block-proxy: true
+
+  # Block datacenter and hosting ranges. These are where most bots come from.
+  block-hosting: true
+
+  # Block Tor exit nodes outright, no matter what the score says.
+  block-tor: true
+
+  # Do not apply the hosting block when a provider says the connection is residential
+  # or mobile. Mobile carriers behind CGNAT get listed in hosting ranges surprisingly
+  # often, and they are real players. Turn this off only if you want no exceptions.
+  allow-residential-hosting: true
+
+  # A hosting flag alone blocks only when other signals add at least this much score
+  # (a provider's proxy vote, reverse DNS, join heuristics). Ordinary ISPs get tagged as
+  # hosting by single providers now and then. 0 blocks every hosting flag, as before.
+  hosting-min-score: 0.5
+
+  # Offline knowledge about networks, read from a feed file so it costs no request per player.
+  # The feed marks end-user networks (E) and hosting-like ones (H). Empty source = off.
+  network-data:
+    source: ""
+    # When no provider could answer (quota used up, outage), refuse hosting-like networks
+    # instead of letting the player in unchecked.
+    fallback-block-hosting: true
+    # Skip the provider lookup for addresses in end-user networks and keep the quota for the rest.
+    # Faster under load, but a proxy on a home connection is no longer asked about.
+    fast-admit-end-user: false
+
+  # Check the downloaded IP lists below.
+  use-lists: true
+
+  # Query the online providers under "api".
+  use-api: true
+
+  # Re-check everyone already online whenever the config is reloaded, and kick
+  # whoever no longer passes. You can also trigger this any time with
+  # /proxyshield recheck
+  recheck-online-on-reload: false
+
+  # Passive mode: nothing is checked at login. /proxyshield check and the API for other
+  # plugins keep working, so another anti-VPN can do the blocking while ProxyShield is
+  # used to look addresses up by hand.
+  passive: false
+
+  # Refuse addresses that can never belong to a real player: documentation, benchmark,
+  # multicast and reserved ranges (0.0.0.0/8, 192.0.2.0/24, 198.18.0.0/15, 224.0.0.0/4,
+  # 2001:db8::/32 and friends). One of these at login means a forwarding layer was lied
+  # to. Private and Tailscale style ranges are not affected.
+  block-bogon: true
+
+  # ---------------------------------------------------------------- network (ASN) rules
+  #
+  # Address lists always lag behind: a VPN rents a new range and the public feeds
+  # catch up days later. The network number behind it changes far less often, so
+  # blocking the ASN stops every address inside it at once.
+  #
+  # Look an ASN up with /proxyshield lookup <ip> - it prints the number.
+  asn:
+    enabled: true
+
+    # Networks that are always blocked, whatever the providers say.
+    # The examples below are hosters whose ranges are almost entirely VPN exits.
+    blocked: []
+    # blocked:
+    #   - "AS9009"    # M247, used by many commercial VPNs
+    #   - "AS62240"   # Clouvider
+    #   - "AS16276"   # OVH
+
+    # Networks that are never blocked. Use this for your own hosting, a school or
+    # a mobile carrier that keeps getting flagged.
+    allowed: []
+
+    # Downloadable lists of networks to block, refreshed together with the address lists
+    # below. Each source is an https URL serving either a JSON array (numbers, strings
+    # like "AS9009", or objects with an "asn" field) or plain text with one network per
+    # line. The last good download is kept in asn-cache.txt.
+    sources: []
+
+  # ---------------------------------------------------------------- reverse DNS
+  #
+  # Hosting and VPN operators name their machines after themselves, so the PTR
+  # record catches ranges no feed knows about yet, costs no API quota and never
+  # runs into a rate limit. It adds weight to the score rather than blocking on
+  # its own, because plenty of ordinary ISPs use words like "host" too.
+  rdns:
+    enabled: true
+
+    # Hard cap on the lookup, so a slow resolver cannot stall a login.
+    timeout-millis: 700
+
+    # How much a match contributes to the score. See api.required-score.
+    weight: 1.0
+
+    # Leave empty to use the built-in list (vpn, proxy, tor-exit, torguard, nordvpn,
+    # expressvpn, surfshark, cyberghost, mullvad, protonvpn, protonmail, datacenter,
+    # hosting, hosted, colo, cloud, server, dedicated, vps and more).
+    #
+    # "protonmail" is not a typo: ProtonVPN names its exits after the mail brand,
+    # so a Swiss exit answers 185-70-41-1.protonmail.ch.
+    patterns: []
+
+  # ---------------------------------------------------------------- ISP filter
+  #
+  # Match the ISP name a provider reports. Entries are case-insensitive regular
+  # expressions; anything that is not a valid one is matched literally. "allowed" wins
+  # over everything after it, including the proxy and hosting flags, so it is the
+  # place for a mobile carrier or a school that keeps getting flagged.
+  isp:
+    blocked: []
+    # blocked:
+    #   - "m247"
+    #   - "^datacamp"
+    allowed: []
+
+country:
+  # Country filtering needs provider data, so the providers are queried even when
+  # detection.use-api is off.
+  enabled: false
+
+  # blacklist = block the countries listed here
+  # whitelist = allow ONLY the countries listed here
+  mode: blacklist
+
+  # ISO 3166-1 alpha-2 codes, e.g. DE, AT, CH, US, GB
+  codes:
+    - "KP"
+
+  # Block when the country cannot be determined at all.
+  block-unknown: false
+
+whitelist:
+  # Never blocked. Accepts a single address, a CIDR block or a start-end range,
+  # in IPv4 or IPv6. Add more in game with /proxyshield whitelist add <entry>
+  ips:
+    - "127.0.0.1"
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
+    - "192.168.0.0/16"
+
+  # Never blocked, by name (case insensitive).
+  players: []
+
+  # Exempt Bedrock players who joined through Geyser/Floodgate.
+  #
+  # Keep this on unless you know you need it off. Whenever Geyser runs anywhere
+  # other than the player's own machine, the address seen here is Geyser's - and
+  # a Geyser instance on rented hardware sits in exactly the datacenter ranges
+  # the feeds list, so every Bedrock player would be dropped at once.
+  # Floodgate derives these UUIDs server side from the Xbox Live account, so a
+  # Java player cannot fake one to skip the check.
+  bedrock-players: true
+
+blacklist:
+  # Always blocked, checked before everything else including trust.
+  ips: []
+
+# ============================================================================
+#  Trust
+#
+#  Regulars stop being re-judged on every login. An account that has connected
+#  cleanly often enough, over long enough, is exempt from the lists, the
+#  providers and the heuristics - but never from blacklist.ips.
+#
+#  This is the single most effective defence against false positives, which is
+#  what actually costs a server players. Mobile users on carrier NAT can land in
+#  a flagged range one evening and not the next; without trust they get kicked
+#  every time it happens.
+# ============================================================================
+trust:
+  enabled: true
+
+  # Clean logins required.
+  min-logins: 5
+
+  # And how many days the account has to have been around.
+  min-days: 3
+
+# ============================================================================
+#  Behavioural heuristics
+#
+#  Every commercial dataset is a list of addresses somebody already reported, so
+#  an attack from a range rented this morning is invisible to all of them. It is
+#  not invisible to the server being attacked: thirty accounts out of one /24
+#  inside a minute is a shape a normal player base does not produce.
+#
+#  These signals add weight to the score, they do not block on their own, so a
+#  school or a Discord community joining together is not a mass kick.
+# ============================================================================
+heuristics:
+  enabled: true
+
+  # Joins per minute from one /24 (IPv6: /48) before the burst counts as a signal.
+  max-joins-per-subnet-per-minute: 12
+
+  # Distinct accounts per address per hour before it counts as a signal.
+  max-accounts-per-ip: 4
+
+  # An account whose country changes inside this many minutes is a signal.
+  # Set to 0 to switch this one off.
+  geo-jump-minutes: 10
+
+  # How much a triggered heuristic contributes to the score.
+  weight: 1.0
+
+# ============================================================================
+#  Connection limit
+#
+#  A hard cap on accounts per address. Unlike heuristics.max-accounts-per-ip, which
+#  only adds weight, a connection over this limit is refused outright. Whitelisted,
+#  local and bypassing players are never counted against it.
+# ============================================================================
+limiter:
+  enabled: false
+
+  # Accounts allowed per address. Keep this above 1: siblings and housemates share
+  # an address, and so do players behind the same mobile carrier.
+  max-per-ip: 3
+
+  # "disable": count players online from the address right now; a slot frees up as
+  #            soon as somebody leaves.
+  # "30m", "2h": count accounts admitted from the address inside that window, which
+  #            also stops a bot that rejoins on a fresh name. Resets on its own.
+  window: "disable"
+
+# ============================================================================
+#  Restricted servers (BungeeCord and Velocity only)
+#
+#  Instead of disconnecting a flagged player, keep them on the backends listed here,
+#  for example the lobby and the login server. They can still talk and appeal, but
+#  cannot reach the game modes. Ignored on Paper, Folia and Sponge.
+# ============================================================================
+restricted:
+  enabled: false
+
+  # whitelist: only the listed servers are allowed
+  # blacklist: every server except the listed ones is allowed
+  mode: whitelist
+
+  # Backend names as in your proxy config. Regular expressions, matched against the
+  # whole name and case-insensitively, so "lobby-\\d+" covers lobby-1, lobby-2...
+  servers: []
+  # servers:
+  #   - "auth"
+  #   - "lobby-\\d+"
+
+# ============================================================================
+#  Account history
+#
+#  Remembers which accounts joined from which address, for /proxyshield alts.
+#  Stored in alts.tsv next to this file.
+# ============================================================================
+alts:
+  enabled: true
+
+  # Forget sightings older than this many days. 0 keeps everything.
+  retention-days: 30
+
+lists:
+  # How often the feeds are re-downloaded.
+  update-interval-hours: 24
+
+  # Keep a copy on disk so a restart is protected even if the feed host is down.
+  disk-cache: true
+
+  # Per source connect and read timeout.
+  timeout-seconds: 20
+
+  # Plain text feeds of addresses, CIDR blocks or ranges. Comments and trailing
+  # text are ignored, so most public lists work as-is.
+  #
+  # The "vpn" feeds are actual VPN exit ranges, the "datacenter" ones are hosting
+  # ranges. The Tor exit list is the most reliable feed there is: those addresses
+  # are published by the network itself.
+  # Remove the ipv6 lines if your server does not accept IPv6 connections.
+  sources:
+    - "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/vpn/ipv4.txt"
+    - "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/vpn/ipv6.txt"
+    - "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/datacenter/ipv4.txt"
+    - "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/datacenter/ipv6.txt"
+    - "https://check.torproject.org/torbulkexitlist"
+    # Open proxies, checked every hour (MIT). Entries come as "socks5://1.2.3.4:1080", the
+    # address is what counts. proxifly's list is much bigger and not verified, so it is left
+    # out by default: "https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/all/data.txt"
+    - "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/all.txt"
+    # Known bad hosts. Optional, but cheap - they are plain text lists.
+    # - "https://lists.blocklist.de/lists/all.txt"
+    # - "https://blocklist.greensnow.co/greensnow.txt"
+    # - "https://cinsscore.com/list/ci-badguys.txt"
+
+# ============================================================================
+#  Providers
+#
+#  How the answers are combined:
+#
+#    consensus (default) - every enabled provider is asked at once and their
+#      weights are added up. The connection is refused once the total reaches
+#      required-score. A service that has never heard of a particular VPN can no
+#      longer wave it through on its own, which is where single-provider setups
+#      lose. The fan-out stops the moment the score is reached, so an obvious
+#      VPN costs one fast answer, not all of them.
+#
+#    failover - ask in order, first answer wins. Fewer requests, weaker
+#      detection. Use it only if you are very tight on quota.
+#
+#  required-score is on the same scale as the weights below. At 1.5 a single
+#  strong provider (weight 1.5+) is enough, or any two weaker ones, or one
+#  weak provider plus a reverse DNS hit. Raise it to 2.5 if you would rather
+#  miss a VPN than kick a real player; lower it to 1.0 to block on any single
+#  hit, which is what most other anti-VPN plugins do by default.
+#
+#  Cost: none of this multiplies your quota the way it looks. Answers are cached
+#  (IPv6 folded to its /64), simultaneous logins from one address share a single
+#  lookup, the cache survives restarts and reloads, and a provider that starts
+#  failing is dropped from the rotation automatically until it recovers.
+# ============================================================================
+api:
+  mode: consensus
+  required-score: 1.5
+
+  # How many providers a lookup asks first. If they all answer and none flags the address, the rest
+  # are never asked, so an ordinary address costs this many requests instead of one per provider
+  # and the free quotas last longer. A flag, a failure or a slow answer brings in the others.
+  # Providers are tried in the order listed under "providers" below, skipping any that are out of
+  # quota or recovering. 0 asks every provider at once.
+  first-wave: 2
+
+  # Per request timeout, and the ceiling for the whole lookup stage of one login.
+  # Whatever has answered by then decides; nobody waits longer than this.
+  timeout-seconds: 4
+  total-timeout-seconds: 6
+
+  # How many provider requests may run at the same time, across all logins. A lookup asks every
+  # provider at once, so 64 serves about a dozen logins per second even when providers are slow.
+  max-parallel: 64
+
+  # How long an answer stays cached. Flagged addresses are kept much longer:
+  # a confirmed VPN range stays one for days, while "looked clean an hour ago"
+  # goes stale quickly.
+  cache-minutes: 360
+  flagged-cache-minutes: 1440
+
+  # Upper bound on cached addresses. Least recently used entries are evicted.
+  max-cache-entries: 10000
+
+  # Write the cache to disk on shutdown and read it back at start-up, so a
+  # restart does not spend its first minutes re-querying addresses already known.
+  persist-cache: true
+
+  # Fallback rate limit for providers that do not bring their own.
+  rate-limit-per-minute: 45
+
+  # --------------------------------------------------------------------------
+  #  Every supported service. Set enabled: true to switch one on.
+  #  The ones marked "no key" work immediately. The others stay inactive until
+  #  you put a key in, and are skipped with one warning at start-up.
+  #
+  #  weight: how much this service counts towards required-score.
+  #  Raise it for a service you trust, lower it for one that cries wolf.
+  #  /proxyshield providers shows how each one is doing.
+  #  /proxyshield check <ip|player> shows what each one said about an address.
+  # --------------------------------------------------------------------------
+  providers:
+
+    # ---- free, no key needed ----
+    # The order is the order lookups use: the first api.first-wave providers are asked first.
+    # Strongest keyless ones first, measured in the public benchmark.
+
+    # The strongest keyless service in the public benchmark. 150 requests a minute per address
+    # without a key, which is plenty with staged lookups. Run by Zowi (api.zowi.gay).
+    zowi:
+      enabled: true
+      weight: 1.5
+      key: ""
+
+    # Proxy, VPN, Tor, cloud and Spamhaus data. Free and unlimited.
+    blackbox:
+      enabled: true
+      weight: 1.0
+
+    # Plain true/false answer.
+    ip-check:
+      enabled: true
+      weight: 1.0
+
+    iplocate:
+      enabled: true
+      weight: 1.5
+      key: ""
+
+    # The classic. HTTPS only on paid plans, hence plain http.
+    ip-api:
+      enabled: true
+      weight: 1.0
+
+    iprisk:
+      enabled: true
+      weight: 1.0
+
+    # Flags nothing without a key in the public benchmark, so it only costs a request.
+    ipquery:
+      enabled: false
+      weight: 1.0
+
+    # Also reports the connection type, which is what makes
+    # detection.allow-residential-hosting work well. Without a key it answers with
+    # identification only and flags nothing, so it stays off until you add one.
+    ipapi-is:
+      enabled: false
+      weight: 1.5
+      key: ""
+
+    freeipapi:
+      enabled: false
+      weight: 1.0
+
+    funkemunky:
+      enabled: false
+      weight: 1.0
+      key: ""
+
+    negativity:
+      enabled: false
+      weight: 1.0
+
+    fastasfuck:
+      enabled: false
+      weight: 1.0
+
+    zombiebot:
+      enabled: false
+      weight: 1.0
+
+    rayzs:
+      enabled: false
+      weight: 1.0
+
+    marvinmc:
+      enabled: false
+      weight: 1.0
+
+    # ---- key required (or much better with one) ----
+
+    # Works without a key at a low daily limit; a free key raises it a lot.
+    proxycheck:
+      enabled: false
+      weight: 2.0
+      key: ""
+
+    # The strongest of the commercial ones, and priced accordingly.
+    ipqualityscore:
+      enabled: false
+      weight: 2.5
+      key: ""
+
+    vpnapi:
+      enabled: false
+      weight: 2.0
+      key: ""
+
+    # Free tier: 1000 checks/day. Reads block=1 only, so its "unclear" answer
+    # does not turn into a kick.
+    iphub:
+      enabled: false
+      weight: 2.0
+      key: ""
+
+    iphunter:
+      enabled: false
+      weight: 2.0
+      key: ""
+
+    ip2location:
+      enabled: false
+      weight: 2.0
+      key: ""
+
+    vpnblocker:
+      enabled: false
+      weight: 1.5
+      key: ""
+
+    # "key" here is the contact e-mail address getipintel requires.
+    getipintel:
+      enabled: false
+      weight: 2.0
+      key: ""
+
+    antivpn-io:
+      enabled: false
+      weight: 2.0
+      key: ""
+
+    2ip:
+      enabled: false
+      weight: 1.5
+      key: ""
+
+    abuseipdb:
+      enabled: false
+      weight: 1.5
+      key: ""
+
+    # ---- your own ----
+    #
+    # Any service not listed above can be described here. Give it a url with
+    # {ip} (and {key} if it needs one), then say where the flags live in the
+    # response. Dotted paths work: "security.vpn" reads {"security":{"vpn":true}}.
+    #
+    # my-provider:
+    #   enabled: false
+    #   url: "https://example.com/api/{ip}?key={key}"
+    #   key: ""
+    #   weight: 1.0
+    #   format: json            # json or plain
+    #   proxy-fields: ["security.vpn", "security.proxy"]
+    #   hosting-fields: ["is_datacenter"]
+    #   country-fields: ["location.country_code"]
+    #   isp-fields: ["asn.org"]
+    #   asn-fields: ["asn.asn"]
+    #   score-field: "risk_score"
+    #   score-threshold: 70
+    #   score-max: 100         # only values inside [threshold, max] count as a hit
+    #   nested-by-ip: false     # true if the answer is keyed by the address
+    #   key-header: ""          # set if the key goes in a header, e.g. X-Key
+    #   rate-limit-per-minute: 45
+    #   headers:                # extra request headers, {key} and {ip} are filled in
+    #     Authorization: "Bearer {key}"
+    #   conditions:
+    #     # Each named group is a list of "<field> <op> <value>" lines that must ALL
+    #     # hold; any one group matching is enough. Ops: = != > >= < <=.
+    #     # Numbers compare as numbers, everything else as text, ignoring case.
+    #     # Conditions work on every provider, listed ones included, but only on
+    #     # JSON answers. settings.debug shows the raw answer to write them against.
+    #     bypass:               # clears every flag this provider raised
+    #       mobile: ["connection.type = mobile"]
+    #       low-risk: ["risk.score < 20", "security.tor = false"]
+    #     flag:                 # flags the address whatever the fields above say
+    #       high-risk: ["risk.score >= 85"]
+    #
+    # For a plain text service that just answers "true" or "Y":
+    # my-simple-provider:
+    #   enabled: false
+    #   url: "https://example.com/check?ip={ip}"
+    #   format: plain
+    #   true-values: ["true", "y", "1"]
+
+# ============================================================================
+#  Storage
+#
+#  Where verdicts and player history are kept.
+#
+#    file    - two JSON files in this folder. No setup, survives a restart, and
+#              the right answer for a single server.
+#    mysql / mariadb / postgresql / sqlite / h2
+#            - a database. Every server pointed at the same one shares its
+#              verdicts, so a network of proxies pays for each address once
+#              instead of once per proxy.
+#    redis   - the same sharing, plus a push: clearing the cache or whitelisting
+#              an address on one server takes effect on the others immediately
+#              rather than when the entry expires.
+#    memory  - keep nothing. Everything is re-learned after a restart.
+#
+#  ProxyShield ships no database driver, because bundling one into the jar would
+#  push a second copy of it into every server that installs the plugin. MySQL and
+#  SQLite drivers are already present on most Bukkit servers. If yours has none,
+#  drop the driver jar into this folder and name it under sql.driver-path.
+#
+#  If the store cannot be reached at start-up, ProxyShield says so once and falls
+#  back to file storage. A database outage never becomes a login outage.
+# ============================================================================
+storage:
+  type: file
+
+  # Identifies this server when it publishes Redis invalidations, so it can ignore
+  # the echo of its own. Leave empty for a random one per start.
+  server-id: ""
+
+  sql:
+    host: "127.0.0.1"
+    port: 3306
+    database: "proxyshield"
+    username: ""
+    password: ""
+
+    # Overrides host/port/database entirely when set, e.g. for an unusual driver.
+    url: ""
+
+    # Appended to the generated URL, e.g. "?useSSL=true".
+    parameters: ""
+
+    pool-size: 4
+
+    # File name of a JDBC driver jar in this folder, if the server has none.
+    driver-path: ""
+
+  redis:
+    host: "127.0.0.1"
+    port: 6379
+    username: ""
+    password: ""
+    database: 0
+    timeout-millis: 2000
+
+    # Key prefix, so several networks can share one Redis instance.
+    prefix: "proxyshield:"
+
+# ============================================================================
+#  Metrics
+#
+#  Anonymous usage statistics via bStats: server count, platform, Java version
+#  and which ProxyShield settings are in use. No addresses, no player data.
+#  Public at https://bstats.org/plugin/bukkit/ProxyShield/33736
+# ============================================================================
+metrics:
+  enabled: true
+
+  # 0 uses the built-in id for this platform. The Bukkit build has one; the
+  # BungeeCord, Velocity and Sponge builds report nothing until an id is set here.
+  plugin-id: 0
+
+notifications:
+  # Silent mode: no staff broadcast and no console line. The log file and the
+  # Discord webhook still record everything.
+  silent: false
+
+  # Print alerts to the server console.
+  console: true
+
+  # Staff with this permission see live alerts.
+  permission: "proxyshield.notify"
+
+  # Append every detection to plugins/ProxyShield/blocks.log
+  # The file is rolled over automatically once it reaches 16 MB.
+  log-file: true
+
+# ============================================================================
+#  Actions
+#
+#  Console commands ProxyShield runs when a connection is flagged.
+#
+#  This is the hook for everything the plugin deliberately does not do itself.
+#  If you would rather mark a flagged player than drop them - put them in a
+#  restricted group, make them verify through Discord, hand the name to another
+#  plugin - write that as a command here.
+#
+#  To flag without kicking, set detection.dry-run to true above. The detection
+#  still fires, the alert and the webhook still go out, these commands still
+#  run, and the player stays connected.
+#
+#  Placeholders:
+#    {player}    name             {uuid}     the account's UUID
+#    {ip}        address          {reason}   why it was flagged, e.g. "proxy/VPN"
+#    {reason_id} machine readable form of the same, e.g. "proxy", "tor"
+#    {country}   country code     {isp}      network operator
+#    {asn}       network number   {score}    combined provider score
+#    {sources}   which services flagged it
+#    {platform}  the server software
+#    {action} and {action_id}     both "kicked" or "allowed"
+#
+#  Careful: the Discord layout further down also has an {action}, but there it
+#  is the readable sentence ("Connection denied"). {action_id} is the short
+#  form in both places.
+# ============================================================================
+actions:
+  # Run with a leading slash or without, both work. Runs as the console, so the
+  # command must be one the console is allowed to use.
+  on-flag: []
+  # on-flag:
+  #   - "lp user {player} permission set myserver.vpnflagged true"
+  #   - "webhook {player} flagged {reason} from {ip}"
+
+  # Seconds to wait before running them.
+  #
+  # A connection is judged before the player is on the server, so at 0 the
+  # commands run while they are still connecting. Anything that needs them
+  # actually online - a message, a teleport, a permission their session has
+  # already loaded - needs a few seconds here. Commands that work offline, like
+  # a LuckPerms permission or a webhook, can stay at 0. Capped at 300.
+  delay-seconds: 0
+
+  # Which detections to run them for.
+  #   always  - every detection (default)
+  #   kicked  - only when the player was actually disconnected
+  #   allowed - only when the player stayed connected, i.e. under dry-run
+  run-when: always
+
+discord:
+  enabled: false
+
+  # Must start with https://
+  webhook-url: ""
+
+  # Set to false to print "hidden" instead of the address.
+  show-ip: true
+
+  # Leave either empty to leave it out of the message: no username posts under
+  # whatever the webhook itself is named, no title gives an embed without a
+  # heading. They are omitted rather than sent empty, which Discord refuses.
+  username: "ProxyShield"
+  title: "ProxyShield Alert"
+
+  # Embed colour as a decimal number. 16711680 = red, 16753920 = orange.
+  color: 16711680
+
+  # --------------------------------------------------------------------------
+  #  Message layout
+  #
+  #  Every visible part of the embed, written out. Delete this whole "embed"
+  #  section and you get the layout ProxyShield sent before 2.4, so an existing
+  #  config keeps looking exactly as it did.
+  #
+  #  Placeholders:
+  #    {player}  {uuid}     {ip}      {reason}   {country}  {isp}
+  #    {asn}     {score}    {sources} {platform} {version}
+  #    {action}     - "Connection denied" or "Logged only (dry run)"
+  #    {action_id}  - "kicked" or "allowed", the same short form the
+  #                   actions.on-flag commands above use
+  #
+  #  Values go in exactly as written, so you decide the formatting. Discord
+  #  reads embed text as Markdown and an underscore is a legal Minecraft name
+  #  character, so wrap anything that might contain one in backticks: without
+  #  them, Some_Name shows up italic and __Name__ underlined with the
+  #  underscores gone.
+  # --------------------------------------------------------------------------
+  embed:
+    # Leave empty to use "title" above. On a dry run "(dry run)" is appended
+    # unless the text already mentions it.
+    title: "ProxyShield Alert"
+
+    # Free text above the fields. Use "|" for more than one line.
+    description: ""
+
+    # Small image in the top right. Must be https.
+    thumbnail: ""
+
+    footer: "ProxyShield {version} on {platform}"
+
+    # One entry per box, in this order. The key is the heading.
+    # "inline: true" is what puts three of them on a row.
+    # Clear the whole list with "fields: {}" to send only the description.
+    fields:
+      Player:
+        value: "`{player}`"
+        inline: true
+      IP:
+        value: "`{ip}`"
+        inline: true
+      Country:
+        value: "{country}"
+        inline: true
+      Reason:
+        value: "{reason}"
+        inline: true
+      ISP:
+        value: "`{isp}`"
+        inline: true
+      Action:
+        value: "{action}"
+        inline: true
+
+  # A single block instead of the six boxes looks like this:
+  #
+  # embed:
+  #   title: "`{player}`"
+  #   description: |
+  #     ```ansi
+  #     IP: `{ip}`
+  #     Country: {country}
+  #     Action: {action}
+  #     ```
+  #   thumbnail: "https://your-server.example/alert.gif"
+  #   footer: "ProxyShield {version} on {platform}"
+  #   fields: {}
+
+# ============================================================================
+#  Telegram
+#
+#  Sends every block as a chat message through a Telegram bot.
+#    1. Create a bot with @BotFather and paste its token below.
+#    2. Add the bot to your group or channel.
+#    3. chat-id: a group id such as -1001234567890, or @yourchannel for a channel.
+#       The bot's getUpdates page shows the id once somebody has written in the group.
+#  In a forum group, thread-id sends to one topic instead of "General".
+# ============================================================================
+telegram:
+  enabled: false
+  bot-token: ""
+  chat-id: ""
+  thread-id: 0
+  show-ip: true
+  # Placeholders: {player} {ip} {reason} {country} {isp} {asn} {score} {sources}
+  # {action}. \n starts a new line.
+  message: "ProxyShield {action}: {player} ({ip})\n{reason} | {country} | {isp}"
+
+# ============================================================================
+#  VK
+#
+#  Sends every block to a VK conversation through messages.send. Use a community
+#  access token with the "messages" permission. peer-id is the conversation:
+#  2000000000 + chat number for a group chat, or a user id for a direct message.
+# ============================================================================
+vk:
+  enabled: false
+  access-token: ""
+  peer-id: 0
+  api-version: "5.199"
+  show-ip: true
+  message: "ProxyShield {action}: {player} ({ip})\n{reason} | {country} | {isp}"
+
+# ============================================================================
+#  Permissions
+#    proxyshield.bypass  - skip all checks
+#    proxyshield.notify  - receive live block alerts
+#    proxyshield.admin   - use /proxyshield
+# ============================================================================

@@ -6,6 +6,10 @@
 #  After editing run:  /proxyshield reload
 # ============================================================================
 
+# Marks which release wrote this file. On an update, ProxyShield adds only the options
+# that release brought and never puts back anything you deleted. Do not edit.
+version: 3
+
 settings:
   # Which message file to use. "en" loads messages_en.yml, "de" loads messages_de.yml.
   # Both ship with the plugin. To add your own, copy one of them to messages_<code>.yml

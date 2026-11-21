@@ -7,8 +7,7 @@
 - **PaperStream intel service as a provider.** `paperstream` is a new default provider, first in
   the list. It answers from a daily built network feed, the public VPN, datacenter, Tor and proxy
   lists and the addresses other ProxyShield servers reported. No key, 600 requests a minute per
-  address, open to everyone at intel.paperstream.dev. Existing configs keep their providers: add
-  the `paperstream` block from the new config.yml under `api.providers` to use it.
+  address, open to everyone at intel.paperstream.dev.
 - **Reporting, off by default.** With `reporting.enabled: true` the addresses refused as proxies
   by the providers are sent to the service together with a random install id, in batches every 10
   minutes. No player names, no UUIDs, no server address. The service keeps them for 14 days and
@@ -22,6 +21,12 @@
   `updates.auto-update` (off by default) or `/proxyshield update install` downloads the new jar into
   the update folder, where the server applies it on the next restart; the running jar is never
   touched. Built on the open updater-api library (Apache-2.0).
+
+- **config.yml upgrades itself.** On start, an existing config.yml gets the options a release really
+  brought, in place and with its comments, and the old file is kept as `config.yml.bak`. Nothing an
+  admin deleted comes back, and no value they edited is touched. The file carries a `version:`
+  marker for this. Installs of 3.0.x get the `paperstream` provider and the `updates` and
+  `reporting` sections that way.
 
 ### Changed
 
