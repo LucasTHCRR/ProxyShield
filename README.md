@@ -25,27 +25,23 @@
 # ProxyShield
 
 Anti-VPN and anti-proxy protection for Minecraft servers. Country filtering, Discord webhook alerts,
-a silent mode and a dry-run mode. One shared detection core, five native builds that behave
-identically.
+a silent mode and a dry-run mode. One shared detection core that behaves identically everywhere.
 
-| Build | File | Runs on |
-|---|---|---|
-| Paper | `ProxyShield-Paper-2.5.1.jar` | Paper, Purpur and Spigot 1.21+ |
-| Folia | `ProxyShield-Folia-2.5.1.jar` | Folia |
-| BungeeCord | `ProxyShield-Bungee-2.5.1.jar` | BungeeCord / Waterfall |
-| Velocity | `ProxyShield-Velocity-2.5.1.jar` | Velocity 3.3+ |
-| Sponge | `ProxyShield-Sponge-2.5.1.jar` | SpongeAPI 17 |
-| Universal | `ProxyShield-Universal-2.5.1.jar` | all five of the above, one file |
+## Download
 
-The universal jar carries all four entry points and all four plugin descriptors at once. Every
-server reads the descriptor it knows and ignores the rest, so the same file drops into a Paper
-`plugins/` folder, a BungeeCord one, a Velocity one or a Sponge `mods/` folder. It costs about
-400 KB over a single-platform jar, which buys one download for a network running several of them.
-The per-platform jars are still the plainer choice when you only run one.
+There is one file for every platform: `ProxyShield-Universal-<version>.jar`.
 
-The Paper and Folia jars are built from the same sources and are interchangeable. The scheduling
-already uses the regionised API, so either one runs on either server. They exist separately because
-server owners look for a jar named after their platform.
+| Runs on | Put it in |
+|---|---|
+| Paper, Purpur and Spigot 1.21+, Folia | `plugins/` |
+| BungeeCord / Waterfall | `plugins/` |
+| Velocity 3.3+ | `plugins/` |
+| Sponge (SpongeAPI 17) | `mods/` |
+
+The jar carries all four entry points and all four plugin descriptors at once. Every server reads
+the descriptor it knows and ignores the rest, so the same file works on a single server and on a
+whole network. Versions before 3.0.2 were also published as one jar per platform. Those files are
+still listed under the older releases.
 
 Spigot is supported by the same jar. Paper and Folia offer `AsyncScheduler`, a per-entity scheduler
 and Adventure components; Spigot has none of the three. The jar picks an implementation at start-up,
@@ -114,7 +110,7 @@ address.
 
 ## Getting started
 
-1. Drop the jar for your platform into `plugins/` and start the server once.
+1. Drop the jar into `plugins/` (`mods/` on Sponge) and start the server once.
 2. Edit `plugins/ProxyShield/config.yml`.
 3. Run `/proxyshield reload`.
 
@@ -403,7 +399,7 @@ Requires JDK 21 and Maven.
 mvn clean package
 ```
 
-The five plugin jars land in `proxyshield-*/target/`. Tests run as part of the build.
+The jars land in `proxyshield-*/target/`; `proxyshield-universal` holds the one that is published. Tests run as part of the build.
 
 ### Module layout
 
