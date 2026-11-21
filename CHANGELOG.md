@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.0.2-RELEASE
+
+### Fixed
+
+- **Velocity shows the real version.** The Velocity jar of 3.0.1 still introduced itself as 3.0.0
+  in the plugin list and in the log, because the number was written into the code by hand. The
+  build now fails when it differs from the version in the pom. Nothing else changed since 3.0.1.
+
 ## 3.0.1-RELEASE
 
 ### Fixed

@@ -61,7 +61,7 @@ import org.slf4j.Logger;
 )
 public final class VelocityMain {
 
-   public static final String VERSION = "3.0.1-RELEASE";
+   public static final String VERSION = "3.0.2-RELEASE";
 
    private final ProxyServer server;
    private final Logger logger;
