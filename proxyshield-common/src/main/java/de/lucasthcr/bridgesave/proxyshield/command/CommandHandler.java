@@ -54,7 +54,7 @@ public final class CommandHandler {
 
    private static final List<String> SUBCOMMANDS = List.of(
          "help", "info", "providers", "reload", "stats", "check", "lookup", "refresh", "recheck",
-         "whitelist", "blacklist", "alts", "clearcache", "dryrun", "silent", "reporting", "update");
+         "whitelist", "blacklist", "alts", "clearcache", "dryrun", "silent", "reporting", "update", "fpreport");
 
    private static final List<String> LIST_ACTIONS =
          List.of("add", "remove", "list", "info", "purge");
@@ -122,6 +122,7 @@ public final class CommandHandler {
          case "recheck" -> doRecheck(sender);
          case "clearcache" -> doClearCache(sender);
          case "check" -> doCheck(sender, args);
+         case "fpreport" -> doFalsePositiveReport(sender, args);
          case "lookup" -> doLookup(sender, args);
          case "whitelist" -> doListCommand(sender, args, core.whitelist(), "whitelist");
          case "blacklist" -> doListCommand(sender, args, core.blacklist(), "blacklist");
@@ -166,7 +167,7 @@ public final class CommandHandler {
          return filter(DURATIONS, args[3]);
       }
       if (args.length == 2 && (sub.equals("check") || sub.equals("lookup")
-            || sub.equals("alts"))) {
+            || sub.equals("alts") || sub.equals("fpreport"))) {
          List<String> names = new ArrayList<>();
          for (ShieldPlayer online : core.platform().onlinePlayers()) {
             names.add(online.name());
@@ -193,7 +194,7 @@ public final class CommandHandler {
       send(sender, "help-header", of("version", core.platform().version()));
       for (String key : List.of("help-info", "help-stats", "help-check", "help-lookup",
             "help-whitelist", "help-blacklist", "help-alts", "help-refresh", "help-recheck",
-            "help-clearcache", "help-reporting", "help-update", "help-reload", "help-footer")) {
+            "help-clearcache", "help-reporting", "help-update", "help-fpreport", "help-reload", "help-footer")) {
          send(sender, key);
       }
    }
@@ -511,6 +512,66 @@ public final class CommandHandler {
                "verdict", verdict,
                "detail", detail.trim()));
       }
+   }
+
+   private void doFalsePositiveReport(Sender sender, String[] args) {
+      if (args.length < 2) {
+         send(sender, "usage-fpreport");
+         return;
+      }
+
+      String target = args[1];
+      String ip = resolveIp(target);
+      if (ip == null) {
+         send(sender, "player-not-found", of("input", target));
+         return;
+      }
+
+      send(sender, "fp-report-start");
+      core.platform().runAsync(() -> {
+         CheckEngine engine = new CheckEngine(core.config(), core.lists(), core.lookups(),
+               core.whitelist(), core.blacklist(), core.reverseDns(), core.trust(), null);
+         CheckVerdict verdict = engine.check(target, null, ip, CheckEngine.PermissionProbe.NONE);
+         LookupResult lookup = verdict.lookup();
+         var network = core.networkData().loaded() ? core.networkData().classify(ip) : null;
+
+         List<String> lines = new ArrayList<>();
+         lines.add("ProxyShield false positive report | " + core.platform().version() + " | "
+               + core.platform().name());
+         lines.add("verdict: " + (verdict.blocked() ? "blocked" : "allowed") + " | " + verdict.describe());
+         if (network != null) {
+            String kind = network.endUser() ? "end user" : network.hosting() ? "hosting"
+                  : network.noUsers() ? "no measured users" : "other";
+            lines.add("network: " + kind + " | " + network.country() + " | AS" + network.asn());
+         } else {
+            lines.add("network: not in the feed");
+         }
+         if (lookup.resolved()) {
+            lines.add("isp: " + lookup.ispOrUnknown() + " | country: " + lookup.countryOrUnknown());
+            lines.add("score: " + String.format(Locale.ROOT, "%.1f", lookup.confidence()) + " of "
+                  + String.format(Locale.ROOT, "%.1f", core.config().requiredScore())
+                  + " | signals: " + lookup.sourceSummary());
+         } else {
+            lines.add("lookup failed: " + lookup.failureReason());
+         }
+         lines.add("on a list: " + yesNo(core.lists().matches(ip)));
+         StringBuilder providers = new StringBuilder("providers:");
+         for (FailoverLookupService.ProviderAnswer answer : core.lookups().diagnose(ip)) {
+            LookupResult result = answer.result();
+            String said = !result.resolved() ? "error"
+                  : result.proxy() || result.hosting() || result.tor() ? "flagged" : "clean";
+            providers.append(' ').append(answer.id()).append('(')
+                  .append(String.format(Locale.ROOT, "%.1f", answer.weight())).append(")=").append(said);
+         }
+         lines.add(providers.toString());
+
+         // Weder Adresse noch Spielername duerfen im Text landen
+         for (String line : lines) {
+            send(sender, "fp-report-line", of("line",
+                  line.replace(ip, "<ip>").replace(target, "<player>")));
+         }
+         send(sender, "fp-report-footer", of("url", "https://codeberg.org/LucasTHCR/ProxyShield/issues"));
+      });
    }
 
    private void doLookup(Sender sender, String[] args) {

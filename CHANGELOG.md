@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **`/proxyshield fpreport <player|ip>`** builds an anonymous report for a wrongly blocked player:
+  version, verdict, network class, country, AS number, score, whether a list matched and what every
+  provider said. It contains neither the address nor the player name. There is an issue template for
+  it ("Wrongly blocked player").
+
 ## 3.1.0-RELEASE
 
 ### Added

@@ -184,3 +184,8 @@ update-staged: "{prefix}&aProxyShield &f{version} &aliegt im Update-Ordner und g
 update-no-folder: "{prefix}&7Diese Plattform hat keinen Update-Ordner. Lade die neue JAR von Modrinth, Hangar oder Codeberg."
 update-failed: "{prefix}&cDie Update-Suche ist fehlgeschlagen: &f{error}"
 help-update: "&e/proxyshield update [install] &8- &7Nach einer neuen Version suchen oder sie bereitlegen"
+usage-fpreport: "{prefix}&cVerwendung: &f/proxyshield fpreport <Spieler|IP>"
+fp-report-start: "{prefix}&7Erstelle einen Bericht. Er enthaelt weder die Adresse noch den Spielernamen."
+fp-report-line: "&7{line}"
+fp-report-footer: "{prefix}&7Kopiere die Zeilen oben in ein neues Issue: &f{url}"
+help-fpreport: "&e/proxyshield fpreport <Spieler|IP> &8- &7Anonymer Bericht fuer einen faelschlich gesperrten Spieler"

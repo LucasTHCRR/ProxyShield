@@ -254,6 +254,11 @@ public final class Messages {
       m.put("update-staged", "{prefix}&aProxyShield &f{version} &ais in the update folder and takes effect on the next restart.");
       m.put("update-no-folder", "{prefix}&7This platform has no update folder. Download the new jar from Modrinth, Hangar or Codeberg.");
       m.put("update-failed", "{prefix}&cThe update check failed: &f{error}");
+      m.put("usage-fpreport", "{prefix}&cUsage: &f/proxyshield fpreport <player|ip>");
+      m.put("fp-report-start", "{prefix}&7Building a report. It contains neither the address nor the player name.");
+      m.put("fp-report-line", "&7{line}");
+      m.put("fp-report-footer", "{prefix}&7Copy the lines above into a new issue: &f{url}");
+      m.put("help-fpreport", "&e/proxyshield fpreport <player|ip> &8- &7Anonymous report for a wrongly blocked player");
       m.put("help-update", "&e/proxyshield update [install] &8- &7Check for a newer version, or stage it");
       m.put("usage-check", "{prefix}&cUsage: &f/proxyshield check <player|ip>");
       m.put("usage-lookup", "{prefix}&cUsage: &f/proxyshield lookup <player|ip>");

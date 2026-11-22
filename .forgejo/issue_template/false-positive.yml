@@ -1,0 +1,36 @@
+name: Wrongly blocked player
+description: A real player was refused or kicked by ProxyShield
+labels: ["false positive"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not post player names or IP addresses. The report below contains neither.
+  - type: textarea
+    id: report
+    attributes:
+      label: Report
+      description: Run `/proxyshield fpreport <player>` while the player is online (or with their address), and paste the lines here.
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: What kind of connection does the player say they use?
+      options:
+        - Home internet
+        - Mobile network
+        - School, university or company network
+        - Satellite (for example Starlink)
+        - Apple iCloud Private Relay or Cloudflare WARP
+        - I do not know
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ProxyShield version and platform
+      placeholder: 3.1.0, Paper
+    validations:
+      required: true

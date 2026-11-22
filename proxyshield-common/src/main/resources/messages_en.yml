@@ -184,3 +184,8 @@ update-staged: "{prefix}&aProxyShield &f{version} &ais in the update folder and 
 update-no-folder: "{prefix}&7This platform has no update folder. Download the new jar from Modrinth, Hangar or Codeberg."
 update-failed: "{prefix}&cThe update check failed: &f{error}"
 help-update: "&e/proxyshield update [install] &8- &7Check for a newer version, or stage it"
+usage-fpreport: "{prefix}&cUsage: &f/proxyshield fpreport <player|ip>"
+fp-report-start: "{prefix}&7Building a report. It contains neither the address nor the player name."
+fp-report-line: "&7{line}"
+fp-report-footer: "{prefix}&7Copy the lines above into a new issue: &f{url}"
+help-fpreport: "&e/proxyshield fpreport <player|ip> &8- &7Anonymous report for a wrongly blocked player"
