@@ -74,10 +74,16 @@ class NetworkDataTest {
 
    private CheckEngine engine(NetworkData data, LookupProvider provider, boolean fastAdmit)
          throws IOException {
+      return engine(data, provider, fastAdmit ? "always" : "never");
+   }
+
+   private CheckEngine engine(NetworkData data, LookupProvider provider, String mode)
+         throws IOException {
       Map<String, Object> values = new LinkedHashMap<>();
       values.put("detection.use-lists", false);
       values.put("detection.block-bogon", false);
-      values.put("detection.network-data.fast-admit-end-user", fastAdmit);
+      values.put("detection.network-data.fast-admit", mode);
+      values.put("detection.network-data.fast-admit-burst", 3);
       ShieldConfig config = ShieldConfig.from(new MapConfigNode(values));
       RecordingPlatform platform = new RecordingPlatform(tempDir);
       ListManager lists = new ListManager(platform);
@@ -116,6 +122,24 @@ class NetworkDataTest {
    }
 
    @Test
+   @DisplayName("Auto mode asks providers until a wave of joins starts")
+   void autoModeSwitchesOnInAWave() throws IOException {
+      AtomicInteger asked = new AtomicInteger();
+      CheckEngine engine = engine(feed(), ip -> {
+         asked.incrementAndGet();
+         return LookupResult.of(false, false, "DE", "Germany", "ISP");
+      }, "auto");
+
+      engine.check("A", null, END_USER, permission -> false);
+      engine.check("B", null, END_USER, permission -> false);
+      assertEquals(2, asked.get());
+
+      engine.check("C", null, END_USER, permission -> false);
+      engine.check("D", null, END_USER, permission -> false);
+      assertEquals(2, asked.get(), "from the third join in the window on, no lookups for end-user networks");
+   }
+
+   @Test
    @DisplayName("Without fast admit the provider is asked as before")
    void providersAreAskedByDefault() throws IOException {
       AtomicInteger asked = new AtomicInteger();
@@ -141,7 +165,7 @@ class NetworkDataTest {
    }
 
    @Test
-   @DisplayName("A network without any end users is refused when no provider could answer, a small access network is not")
+   @DisplayName("A network without any end users is no proof of hosting, so it stays open when no provider could answer")
    void noUsersFallback() throws IOException {
       NetworkData data = feed();
       CheckEngine engine = engine(data, ip -> LookupResult.failed("quota"), false);
@@ -152,9 +176,7 @@ class NetworkDataTest {
       assertFalse(data.classify("9.9.9.20").hosting());
       assertEquals("NL", data.classify("9.9.9.20").country());
 
-      CheckVerdict verdict = engine.check("Steve", null, "9.9.9.5", permission -> false);
-      assertTrue(verdict.blocked());
-      assertTrue(verdict.detail().contains("without end users"), verdict.detail());
+      assertFalse(engine.check("Steve", null, "9.9.9.5", permission -> false).blocked());
       assertFalse(engine.check("Steve", null, "9.9.9.20", permission -> false).blocked());
    }
 

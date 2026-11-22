@@ -149,7 +149,8 @@ public final class ShieldConfig {
    private final String reportingUrl;
    private final int reportingIntervalMinutes;
    private final boolean networkFallbackHosting;
-   private final boolean networkFastAdmit;
+   private final String networkFastAdmitMode;
+   private final int networkFastAdmitBurst;
    private final boolean asnEnabled;
    private final Set<String> blockedAsns;
    private final Set<String> allowedAsns;
@@ -277,7 +278,12 @@ public final class ShieldConfig {
       this.listUpdateIntervalHours = Math.max(1L, node.getLong("lists.update-interval-hours", 24L));
       this.listTimeoutSeconds = clamp(node.getInt("lists.timeout-seconds", 20), 1, 300);
       this.listDiskCache = node.getBoolean("lists.disk-cache", true);
-      this.listSources = List.copyOf(node.getStringList("lists.sources"));
+      List<String> sources = new java.util.ArrayList<>(node.getStringList("lists.sources"));
+      String relays = "https://intel.paperstream.dev/feed/operators.txt";
+      if (node.getBoolean("lists.operator-relays", true) && !sources.contains(relays)) {
+         sources.add(relays);
+      }
+      this.listSources = List.copyOf(sources);
 
       // Superseded by api.providers. Empty by default so an empty provider list stays empty
       // rather than silently falling back to a hardcoded endpoint.
@@ -310,7 +316,16 @@ public final class ShieldConfig {
             ? reportingTarget.substring(0, reportingTarget.length() - 1) : reportingTarget;
       this.reportingIntervalMinutes = Math.max(1, Math.min(1440, node.getInt("reporting.interval-minutes", 10)));
       this.networkFallbackHosting = node.getBoolean("detection.network-data.fallback-block-hosting", true);
-      this.networkFastAdmit = node.getBoolean("detection.network-data.fast-admit-end-user", false);
+      String fastAdmit = node.getString("detection.network-data.fast-admit", "auto").trim().toLowerCase(java.util.Locale.ROOT);
+      if (node.getBoolean("detection.network-data.fast-admit-end-user", false)) {
+         fastAdmit = "always";
+      }
+      this.networkFastAdmitMode = switch (fastAdmit) {
+         case "always", "true", "on" -> "always";
+         case "never", "false", "off" -> "never";
+         default -> "auto";
+      };
+      this.networkFastAdmitBurst = Math.max(1, node.getInt("detection.network-data.fast-admit-burst", 20));
       this.asnEnabled = node.getBoolean("detection.asn.enabled", true);
       this.blockedAsns = normalizedAsns(node.getStringList("detection.asn.blocked"));
       this.allowedAsns = normalizedAsns(node.getStringList("detection.asn.allowed"));
@@ -949,8 +964,12 @@ public final class ShieldConfig {
    }
 
    /** Skip provider lookups for addresses in end-user networks. */
-   public boolean networkFastAdmit() {
-      return networkFastAdmit;
+   public String networkFastAdmitMode() {
+      return networkFastAdmitMode;
+   }
+
+   public int networkFastAdmitBurst() {
+      return networkFastAdmitBurst;
    }
 
    /** Score a hosting flag needs from other signals before it blocks. */

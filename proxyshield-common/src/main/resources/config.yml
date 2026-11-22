@@ -61,8 +61,11 @@ detection:
     # instead of letting the player in unchecked.
     fallback-block-hosting: true
     # Skip the provider lookup for addresses in end-user networks and keep the quota for the rest.
-    # Faster under load, but a proxy on a home connection is no longer asked about.
-    fast-admit-end-user: false
+    # auto: only while many players join at once (a wave), always: every join, never: off.
+    # Faster under load, but a proxy on a home connection is not asked about while it is active.
+    fast-admit: auto
+    # Joins within 10 seconds that count as a wave for "auto".
+    fast-admit-burst: 20
 
   # Check the downloaded IP lists below.
   use-lists: true
@@ -310,6 +313,10 @@ lists:
   # ranges. The Tor exit list is the most reliable feed there is: those addresses
   # are published by the network itself.
   # Remove the ipv6 lines if your server does not accept IPv6 connections.
+  # Relay servers that VPN operators publish themselves (Mullvad, IVPN), kept by intel.paperstream.dev.
+  # Every address in it is a VPN server, so a hit refuses the player at once.
+  operator-relays: true
+
   sources:
     - "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/vpn/ipv4.txt"
     - "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/vpn/ipv6.txt"

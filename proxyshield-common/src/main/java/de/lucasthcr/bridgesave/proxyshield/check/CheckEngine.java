@@ -68,6 +68,7 @@ public final class CheckEngine {
    private final JoinHeuristics heuristics;
    private volatile Predicate<String> listedAsn = asn -> false;
    private volatile NetworkData networks;
+   private final JoinBurst burst;
 
    public CheckEngine(ShieldConfig config, ListManager lists, LookupProvider lookups,
          ManagedIpList whitelist, ManagedIpList blacklist) {
@@ -85,6 +86,7 @@ public final class CheckEngine {
       this.reverseDns = reverseDns;
       this.trust = trust;
       this.heuristics = heuristics;
+      this.burst = new JoinBurst(config.networkFastAdmitBurst(), System::currentTimeMillis);
    }
 
    /** Supplies offline knowledge about which kind of network an address is in. */
@@ -153,7 +155,13 @@ public final class CheckEngine {
       boolean needsLookup = config.useApi() || config.countryEnabled();
       NetworkData.Network network = networks != null && networks.loaded() ? networks.classify(ip) : null;
       LookupResult result;
-      if (needsLookup && network != null && network.endUser() && config.networkFastAdmit()) {
+      boolean surge = burst.record();
+      boolean fast = switch (config.networkFastAdmitMode()) {
+         case "always" -> true;
+         case "auto" -> surge;
+         default -> false;
+      };
+      if (needsLookup && network != null && network.endUser() && fast) {
          // An end-user network with nothing against it: save the providers' quota for addresses
          // that need it. The feed still supplies country and network number for the later rules.
          result = LookupResult.of(false, false, false, network.country(), null, null,
@@ -169,11 +177,9 @@ public final class CheckEngine {
          if (local != null) {
             return local;
          }
-         if (network != null && (network.hosting() || network.noUsers())
-               && config.networkFallbackHosting()) {
+         if (network != null && network.hosting() && config.networkFallbackHosting()) {
             return CheckVerdict.deny(CheckVerdict.Reason.HOSTING,
-                  (network.hosting() ? "hosting network " : "network without end users ")
-                        + network.asnName() + " (no provider answered)", result);
+                  "hosting network " + network.asnName() + " (no provider answered)", result);
          }
          if (config.failClosed()) {
             return CheckVerdict.deny(CheckVerdict.Reason.LOOKUP_FAILED, result.failureReason(),

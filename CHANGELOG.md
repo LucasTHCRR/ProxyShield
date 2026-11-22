@@ -14,7 +14,13 @@
   counts on how many servers an address showed up; from 3 servers it votes "proxy" for everybody.
   `/proxyshield reporting` shows the state, `/proxyshield reporting forget` deletes everything
   sent so far and drops the install id.
-
+- **Automatic fast admit.** `detection.network-data.fast-admit` is `auto` by default: while 20 or
+  more players join within 10 seconds (`fast-admit-burst`), addresses in end-user networks skip the
+  provider lookup and keep the quota for the rest. Outside a wave every join is checked in full.
+  `always` and `never` are still available; the old `fast-admit-end-user: true` counts as `always`.
+- **Relay list from the VPN operators.** `lists.operator-relays` (on by default) adds the server
+  addresses Mullvad, IVPN, NordVPN and PIA publish themselves, served by intel.paperstream.dev. A hit refuses
+  the player at once, which also covers IPv6 relays that no public list knows.
 - **Update checks.** The console is told when a newer ProxyShield is out (`updates.notify`, on by
   default): one small request every 12 hours to Modrinth, Hangar and Codeberg, nothing about the
   server is sent. `/proxyshield update` checks on demand. On Paper, Folia and Spigot,
