@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.1.0-BETA
+## 3.1.0-RELEASE
 
 ### Added
 
@@ -39,8 +39,16 @@
 - **The network feed is on by default** for new installs: `detection.network-data.source` points at
   the feed of the service. Existing configs keep their value.
 - **The feed covers every announced range** and has two more classes: `N` for networks where
-  nobody was measured at all and `S` for small access networks. `fallback-block-hosting` now also
-  refuses an `N` network when no provider could answer. `S` is only used for country and ASN.
+  nobody was measured at all and `S` for small access networks. Both are only used for country
+  and ASN. A network without measured users is no proof of hosting, so it is neither refused by
+  `fallback-block-hosting` nor called hosting by the service.
+
+### Tested
+
+Started and joined with a bot on Paper 1.21.11 and Folia 1.21.11, started on Paper 26.3,
+BungeeCord and Velocity, each with the update check. A Velocity proxy took 1,000 joins in 20
+seconds with the provider quotas of the free services. Sponge was built and unit tested but not
+started.
 
 ## 3.0.2-RELEASE
 
