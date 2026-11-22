@@ -27,6 +27,10 @@
 Anti-VPN and anti-proxy protection for Minecraft servers. Country filtering, Discord webhook alerts,
 a silent mode and a dry-run mode. One shared detection core that behaves identically everywhere.
 
+Since 3.1 it comes with its own free detection service, [PaperStream Intel](https://paperstream.dev/api),
+which is switched on out of the box: no key, no account, and a daily built network feed that keeps
+working when the free services run out of quota.
+
 ## Download
 
 There is one file for every platform: `ProxyShield-Universal-<version>.jar`.
@@ -53,13 +57,19 @@ address.
 
 ---
 
-**[Watch ProxyShield in action](https://www.youtube.com/watch?v=p5o02yoP04Q)** — a short demonstration of the checks, the verdict and what a blocked connection looks like.
+**[Watch ProxyShield in action](https://www.youtube.com/watch?v=p5o02yoP04Q)** - a short demonstration of the checks, the verdict and what a blocked connection looks like.
 
 ## Features
 
 **Detection**
 
-- 26 IP intelligence services built in, enabled by name - 15 of them need no API key at all
+- 27 IP intelligence services built in, enabled by name - 16 of them need no API key at all
+- PaperStream Intel as the first provider: network type, country and ASN from a daily feed, VPN,
+  proxy and Tor lists, and addresses other ProxyShield servers reported
+- The server lists that VPN operators publish themselves (Mullvad, IVPN, NordVPN, Private Internet
+  Access), including IPv6 relays that no public list knows. A hit refuses the player at once
+- Offline network feed: home and mobile networks are told apart from hosting networks without a
+  request per player, so a quota that runs out does not open the door
 - Consensus scoring: several providers are asked at once and their weights added up, so one service
   that has never heard of a VPN cannot clear it, and one noisy service cannot kick anybody alone
 - Public VPN, datacenter and Tor exit feeds with correct CIDR matching, IPv4 and IPv6
@@ -76,6 +86,8 @@ address.
 - Manual blacklist, checked before everything else
 - Connection limit per address, by players online or within a time window
 - Configurable fail-open or fail-closed behaviour when a check cannot complete
+- Automatic fast admit: while many players join at once, addresses in home networks skip the
+  provider lookup and keep the quota for the rest, so a join wave does not wear the services out
 
 **Exemptions**
 
@@ -104,6 +116,12 @@ address.
 - Telegram and VK alerts
 - Block log at `plugins/ProxyShield/blocks.log`
 - Full `/proxyshield` command set with tab completion
+- Update check in the console (once every 12 hours, nothing about your server is sent) and on
+  request with `/proxyshield update`; on Paper, Folia and Spigot the new jar can be downloaded into
+  the update folder automatically, if you switch that on
+- `config.yml` upgrades itself on start: new options appear with their comments, nothing you
+  deleted comes back and no value you changed is touched
+- Optional reporting to PaperStream Intel, off by default
 - English and German out of the box, any language by copying one file
 
 ---
@@ -145,6 +163,23 @@ the rotation until it recovers.
 
 A service the catalog does not know can be described directly in `config.yml` with a URL and dotted
 field paths - see the commented example at the bottom of the `providers` section.
+
+### PaperStream Intel
+
+PaperStream Intel is our own free anti-VPN service and the first provider in the list. It answers
+from a network feed that is rebuilt every night, from public VPN, datacenter, Tor and proxy lists,
+from the server lists the VPN operators publish, and from addresses that other ProxyShield servers
+reported. No key and no account, 600 requests a minute per address.
+
+- Look up any address or test your own connection: [paperstream.dev/vpn](https://paperstream.dev/vpn)
+- API for your own plugin, bot or website: [paperstream.dev/api](https://paperstream.dev/api)
+
+**Reporting is optional and off by default.** With `reporting.enabled: true` the addresses that the
+providers refused as proxies are sent in batches every 10 minutes, together with a random install
+id. No player names, no UUIDs, no server address. The service keeps them for 14 days and counts on
+how many servers an address showed up; from 3 servers it votes "proxy" for everybody.
+`/proxyshield reporting` shows the state and `/proxyshield reporting forget` deletes everything that
+was sent. Details are in the [privacy policy](https://paperstream.dev/datenschutz).
 
 ### Country filtering
 
@@ -324,6 +359,8 @@ All of these need `proxyshield.admin`. Aliases: `/ps`, `/antivpn`.
 | `/proxyshield blacklist <add\|remove\|info\|list\|purge> [entry] [time] [reason]` | Manage the always-block list |
 | `/proxyshield alts <player\|ip>` | Every account seen on the same address |
 | `/proxyshield refresh` | Re-download the feeds |
+| `/proxyshield update [install]` | Check for a new version, `install` downloads it into the update folder |
+| `/proxyshield reporting [forget]` | Show the state of reporting, `forget` deletes everything sent so far |
 | `/proxyshield recheck` | Re-check everyone online, disconnect whoever fails |
 | `/proxyshield clearcache` | Drop cached lookup results |
 | `/proxyshield reload` | Re-read `config.yml` and the message file |
@@ -404,7 +441,7 @@ The jars land in `proxyshield-*/target/`; `proxyshield-universal` holds the one 
 ### Module layout
 
 ```
-proxyshield-common     detection core, no platform APIs, 124 tests
+proxyshield-common     detection core, no platform APIs, 321 tests
 proxyshield-paper      Bukkit adapter    -> AsyncPlayerPreLoginEvent, Paper/Folia/Spigot
 proxyshield-folia      same sources as proxyshield-paper, own descriptor and jar name
 proxyshield-bungee     Bungee adapter    -> LoginEvent with intents
