@@ -11,6 +11,7 @@
 
 ### Changed
 
+- The start-up log now tells once that the optional reporting to PaperStream Intel is off and how to turn it on.
 - Config comment for the Zowi provider: the keyless limit is now 250 requests a minute per address (was 150).
   The built-in limit of 120 a minute stays as it was.
 

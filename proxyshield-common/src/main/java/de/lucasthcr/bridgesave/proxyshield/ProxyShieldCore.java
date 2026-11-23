@@ -557,6 +557,9 @@ public final class ProxyShieldCore {
          platform.info("Reporting is on: addresses refused as proxies are sent to " + current.reportingUrl()
                + " (no names, no UUIDs). Turn it off with reporting.enabled, delete what was sent with"
                + " /proxyshield reporting forget.");
+      } else {
+         platform.info("Tip: reporting.enabled lets this server help the others (addresses refused as proxies,"
+               + " no names, no UUIDs). It is off by default. Details: https://paperstream.dev/datenschutz");
       }
    }
 
