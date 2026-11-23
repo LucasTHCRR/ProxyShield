@@ -167,7 +167,7 @@ public final class CheckEngine {
          result = LookupResult.of(false, false, false, network.country(), null, null,
                network.asnName(), null, 0.0, List.of());
       } else {
-         result = needsLookup ? lookups.lookup(ip) : LookupResult.UNKNOWN;
+         result = needsLookup ? lookups.lookup(ip, network != null && network.endUser()) : LookupResult.UNKNOWN;
       }
 
       if (needsLookup && !result.resolved()) {

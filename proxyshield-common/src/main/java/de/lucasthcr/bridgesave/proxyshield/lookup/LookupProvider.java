@@ -36,4 +36,12 @@ public interface LookupProvider {
     * Never throws: a failure comes back as an unresolved {@link LookupResult}.
     */
    LookupResult lookup(String ip);
+
+   /**
+    * Same lookup with a hint about the address: in a network the offline feed knows as home or mobile
+    * access, a provider that is still slow may be stopped early once another one has said "clean".
+    */
+   default LookupResult lookup(String ip, boolean endUserNetwork) {
+      return lookup(ip);
+   }
 }

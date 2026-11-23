@@ -4,6 +4,9 @@
 
 ### Added
 
+- **`api.clean-settle-ms`** (off by default): an address in a home or mobile network can be let through after this
+  many milliseconds on one clean answer. Measured: real players log in about a fifth faster, but open proxies in home
+  networks are found less often, so it stays off unless you choose it.
 - **`/proxyshield fpreport <player|ip>`** builds an anonymous report for a wrongly blocked player:
   version, verdict, network class, country, AS number, score, whether a list matched and what every
   provider said. It contains neither the address nor the player name. There is an issue template for

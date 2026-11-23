@@ -72,6 +72,8 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
    private final ShieldConfig.LookupMode mode;
    private final double requiredScore;
    private final int firstWave;
+   private final long cleanSettleMillis;
+   private final AtomicLong cleanSettles = new AtomicLong();
    private final AtomicLong stagedSkips = new AtomicLong();
    private final long cleanTtlMillis;
    private final long flaggedTtlMillis;
@@ -116,6 +118,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       this.mode = config.lookupMode();
       this.requiredScore = config.requiredScore();
       this.firstWave = config.apiFirstWave();
+      this.cleanSettleMillis = config.apiCleanSettleMillis();
       this.cleanTtlMillis = config.apiCacheMinutes() * 60_000L;
       this.flaggedTtlMillis = config.apiFlaggedCacheMinutes() * 60_000L;
       this.totalBudgetMillis = config.apiTotalTimeoutSeconds() * 1000L;
@@ -192,6 +195,11 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
 
    @Override
    public LookupResult lookup(String ip) {
+      return lookup(ip, false);
+   }
+
+   @Override
+   public LookupResult lookup(String ip, boolean endUserNetwork) {
       String key = IpAddresses.cacheKey(ip);
 
       Optional<LookupResult> hit = cache.get(key);
@@ -221,7 +229,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       try {
          Round round = mode == ShieldConfig.LookupMode.FAILOVER
                ? new Round(failover(ip), true)
-               : consensus(ip);
+               : consensus(ip, endUserNetwork ? cleanSettleMillis : 0);
          LookupResult result = round.result();
 
          lookups.incrementAndGet();
@@ -298,7 +306,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
     * Either way the round returns as soon as the threshold is reached and cancels what is still
     * running, so an obvious VPN costs the latency of the fastest provider that recognises it.
     */
-   private Round consensus(String ip) {
+   private Round consensus(String ip, long softMillis) {
       ExecutorCompletionService<ProviderAnswer> completions =
             new ExecutorCompletionService<>(executor);
       List<Future<ProviderAnswer>> pending = new ArrayList<>(providers.size());
@@ -318,7 +326,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       long deadline = System.currentTimeMillis() + totalBudgetMillis;
       try {
          submit(completions, pending, ready.subList(0, firstSize), ip);
-         int state = collect(completions, firstSize, merge, deadline);
+         int state = collect(completions, firstSize, merge, deadline, softMillis);
          if (state == COLLECT_DONE && firstSize < ready.size()) {
             if (merge.answered == firstSize && merge.proxyScore == 0.0 && merge.hostingScore == 0.0) {
                merge.settledEarly();
@@ -326,7 +334,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
             } else {
                int rest = ready.size() - firstSize;
                submit(completions, pending, ready.subList(firstSize, ready.size()), ip);
-               collect(completions, rest, merge, deadline);
+               collect(completions, rest, merge, deadline, 0);
             }
          }
       } catch (InterruptedException interrupted) {
@@ -352,23 +360,44 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       }
    }
 
-   /** Takes {@code count} answers in the order they arrive, or stops on a settled verdict. */
+   /**
+    * Takes {@code count} answers in the order they arrive, or stops on a settled verdict.
+    * <p>
+    * With {@code softMillis} above zero (an address in a home network) it also stops when that time has
+    * passed, one provider has answered clean and no provider has flagged anything: waiting for the slowest
+    * provider then costs the player more than it adds. The verdict is not treated as complete, so it is
+    * cached only briefly.
+    */
    private int collect(ExecutorCompletionService<ProviderAnswer> completions, int count,
-         Merge merge, long deadline) throws InterruptedException {
-      for (int taken = 0; taken < count; taken++) {
-         long remaining = deadline - System.currentTimeMillis();
+         Merge merge, long deadline, long softMillis) throws InterruptedException {
+      long softAt = softMillis > 0 ? System.currentTimeMillis() + softMillis : 0;
+      int taken = 0;
+      while (taken < count) {
+         long now = System.currentTimeMillis();
+         long remaining = deadline - now;
          if (remaining <= 0) {
             budgetExceeded.incrementAndGet();
             return COLLECT_BUDGET;
          }
 
+         long wait = softAt > 0 ? Math.min(remaining, Math.max(1, softAt - now)) : remaining;
          // Take answers in the order they arrive, so a slow provider never holds up a verdict
          // a fast one has already settled.
-         Future<ProviderAnswer> completed = completions.poll(remaining, TimeUnit.MILLISECONDS);
+         Future<ProviderAnswer> completed = completions.poll(wait, TimeUnit.MILLISECONDS);
          if (completed == null) {
+            if (softAt > 0 && System.currentTimeMillis() >= softAt) {
+               if (merge.answered >= 1 && merge.proxyScore == 0.0 && merge.hostingScore == 0.0) {
+                  merge.softSettled();
+                  cleanSettles.incrementAndGet();
+                  return COLLECT_SETTLED;
+               }
+               softAt = 0;  // nothing clean to rely on yet, wait the normal way
+               continue;
+            }
             budgetExceeded.incrementAndGet();
             return COLLECT_BUDGET;
          }
+         taken++;
 
          ProviderAnswer answer;
          try {
@@ -421,6 +450,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       private final LinkedHashSet<String> flaggedBy = new LinkedHashSet<>();
       private int answered;
       private int settledEarly;
+      private boolean soft;
       private double proxyScore;
       private double hostingScore;
       private boolean resolved;
@@ -465,12 +495,17 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
          settledEarly++;
       }
 
+      /** Marks that the loop stopped at the time limit on one clean answer: not the full picture. */
+      void softSettled() {
+         soft = true;
+      }
+
       /**
        * Whether the verdict rests on the full picture. Stopping early because the score was
        * already reached counts as complete: the remaining answers could not have changed it.
        */
       boolean complete(int asked) {
-         return settledEarly > 0 || answered >= asked;
+         return !soft && (settledEarly > 0 || answered >= asked);
       }
 
       LookupResult toResult(double requiredScore) {
@@ -558,6 +593,11 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
 
    public long cacheHits() {
       return cache.hits();
+   }
+
+   /** Lookups that stopped at the time limit on one clean answer. */
+   public long cleanSettles() {
+      return cleanSettles.get();
    }
 
    public long lookups() {

@@ -59,6 +59,7 @@ class ConsensusLookupTest {
    private HttpServer server;
    private String baseUrl;
    private RecordingPlatform platform;
+   private int settleMs;
 
    @BeforeEach
    void startServer() throws IOException {
@@ -101,6 +102,7 @@ class ConsensusLookupTest {
       values.put("api.required-score", requiredScore);
       values.put("api.timeout-seconds", 5);
       values.put("api.total-timeout-seconds", 10);
+      values.put("api.clean-settle-ms", settleMs);
 
       int index = 0;
       for (Map.Entry<String, Double> entry : pathsToWeights.entrySet()) {
@@ -148,6 +150,75 @@ class ConsensusLookupTest {
 
          assertTrue(result.proxy());
          assertEquals(2, result.sources().size(), "both services should be named in the alert");
+      }
+   }
+
+   @Test
+   @DisplayName("A home network address does not wait for a slow provider once one has said clean")
+   void cleanAnswerSettlesAtTheTimeLimitInAHomeNetwork() {
+      settleMs = 200;
+      serve("/fast", exchange -> respond(exchange, 200, "{\"proxy\":false,\"countryCode\":\"DE\"}"));
+      serve("/slow", exchange -> {
+         sleep(1500);
+         respond(exchange, 200, "{\"proxy\":true}");
+      });
+
+      try (FailoverLookupService service = service(1.0,
+            new LinkedHashMap<>(Map.of("/fast", 1.0, "/slow", 1.0)))) {
+         long started = System.nanoTime();
+         LookupResult result = service.lookup(IP, true);
+         long millis = (System.nanoTime() - started) / 1_000_000;
+
+         assertTrue(result.resolved());
+         assertFalse(result.proxy());
+         assertTrue(millis < 1000, "should not have waited for the slow provider, took " + millis + " ms");
+         assertEquals(1, service.cleanSettles());
+      }
+   }
+
+   @Test
+   @DisplayName("An address outside a home network always waits for the full first wave")
+   void otherNetworksWaitForEveryone() {
+      settleMs = 200;
+      serve("/fast", exchange -> respond(exchange, 200, "{\"proxy\":false}"));
+      serve("/slow", exchange -> {
+         sleep(800);
+         respond(exchange, 200, "{\"proxy\":true}");
+      });
+
+      try (FailoverLookupService service = service(1.0,
+            new LinkedHashMap<>(Map.of("/fast", 1.0, "/slow", 1.0)))) {
+         LookupResult result = service.lookup(IP, false);
+
+         assertTrue(result.proxy(), "the slow provider's flag must count outside a home network");
+         assertEquals(0, service.cleanSettles());
+      }
+   }
+
+   @Test
+   @DisplayName("A flag from the fast provider is never settled early")
+   void aFlagIsNotSettledEarly() {
+      settleMs = 200;
+      serve("/fast", exchange -> respond(exchange, 200, "{\"proxy\":true}"));
+      serve("/slow", exchange -> {
+         sleep(700);
+         respond(exchange, 200, "{\"proxy\":true}");
+      });
+
+      try (FailoverLookupService service = service(2.0,
+            new LinkedHashMap<>(Map.of("/fast", 1.0, "/slow", 1.0)))) {
+         LookupResult result = service.lookup(IP, true);
+
+         assertTrue(result.proxy(), "both flags have to be counted, the fast flag alone is not clean");
+         assertEquals(0, service.cleanSettles());
+      }
+   }
+
+   private static void sleep(long millis) {
+      try {
+         Thread.sleep(millis);
+      } catch (InterruptedException interrupted) {
+         Thread.currentThread().interrupt();
       }
    }
 

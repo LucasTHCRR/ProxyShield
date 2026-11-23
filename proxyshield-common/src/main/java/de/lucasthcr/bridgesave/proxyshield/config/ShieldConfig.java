@@ -128,6 +128,7 @@ public final class ShieldConfig {
    private final List<ProviderDefinition> providers;
    private final LookupMode lookupMode;
    private final int apiFirstWave;
+   private final int apiCleanSettleMillis;
    private final double requiredScore;
    private final int apiTimeoutSeconds;
    private final int apiTotalTimeoutSeconds;
@@ -291,6 +292,7 @@ public final class ShieldConfig {
       this.apiProviders = List.copyOf(node.getStringList("api.providers"));
       this.lookupMode = LookupMode.parse(node.getString("api.mode", "consensus"));
       this.apiFirstWave = clamp(node.getInt("api.first-wave", 2), 0, 32);
+      this.apiCleanSettleMillis = clamp(node.getInt("api.clean-settle-ms", 0), 0, 5000);
       this.requiredScore = Math.max(0.1, node.getDouble("api.required-score", 1.0));
       this.apiTimeoutSeconds = clamp(node.getInt("api.timeout-seconds", 4), 1, 60);
       this.apiTotalTimeoutSeconds = clamp(node.getInt("api.total-timeout-seconds", 6), 1, 120);
@@ -898,6 +900,11 @@ public final class ShieldConfig {
    /** Providers asked first in consensus mode, 0 for all at once. */
    public int apiFirstWave() {
       return apiFirstWave;
+   }
+
+   /** After this many milliseconds an address in a home network is let through on one clean answer. 0 = off (default). */
+   public int apiCleanSettleMillis() {
+      return apiCleanSettleMillis;
    }
 
    public LookupMode lookupMode() {
