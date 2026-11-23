@@ -416,7 +416,7 @@ api:
       enabled: true
       weight: 1.0
 
-    # The strongest keyless service in the public benchmark. 150 requests a minute per address
+    # The strongest keyless service in the public benchmark. 250 requests a minute per address
     # without a key, which is plenty with staged lookups. Run by Zowi (api.zowi.gay).
     zowi:
       enabled: true

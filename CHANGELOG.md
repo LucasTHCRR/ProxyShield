@@ -9,6 +9,11 @@
   provider said. It contains neither the address nor the player name. There is an issue template for
   it ("Wrongly blocked player").
 
+### Changed
+
+- Config comment for the Zowi provider: the keyless limit is now 250 requests a minute per address (was 150).
+  The built-in limit of 120 a minute stays as it was.
+
 ## 3.1.0-RELEASE
 
 ### Added
