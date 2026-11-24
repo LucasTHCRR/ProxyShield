@@ -362,6 +362,8 @@ All of these need `proxyshield.admin`. Aliases: `/ps`, `/antivpn`.
 | `/proxyshield update [install]` | Check for a new version, `install` downloads it into the update folder |
 | `/proxyshield reporting [forget]` | Show the state of reporting, `forget` deletes everything sent so far |
 | `/proxyshield recheck` | Re-check everyone online, disconnect whoever fails |
+| `/proxyshield allow <code> [minutes]` | Lets a refused player through for a while, with the code from the kick screen |
+| `/proxyshield fpreport <player\|ip>` | Anonymous report for a wrongly blocked player (version, verdict, network, provider answers) |
 | `/proxyshield clearcache` | Drop cached lookup results |
 | `/proxyshield reload` | Re-read `config.yml` and the message file |
 
