@@ -14,6 +14,10 @@
     <name>ProxyShield Common</name>
     <description>Platform independent detection core.</description>
 
+    <properties>
+        <maven.compiler.release>17</maven.compiler.release>
+    </properties>
+
     <dependencies>
         <!-- Update checks. Shaded and relocated by every platform jar; Gson comes with the server. -->
         <dependency>

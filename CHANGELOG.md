@@ -14,6 +14,9 @@
 
 ### Changed
 
+- **Runs on Java 17 now**, so the same jar also works on Paper, Purpur and Folia 1.18 to 1.20 (it needed Java 21 and
+  Minecraft 1.21 before). The shared code is checked against the Java 17 library; tested on Paper 1.18.2 and 1.20.4
+  (Java 17): start-up, lists, network feed and `/proxyshield check`. `api-version` in the plugin descriptor is 1.18.
 - The start-up log now tells once that the optional reporting to PaperStream Intel is off and how to turn it on.
 - Config comment for the Zowi provider: the keyless limit is now 250 requests a minute per address (was 150).
   The built-in limit of 120 a minute stays as it was.

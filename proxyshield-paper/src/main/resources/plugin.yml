@@ -1,7 +1,7 @@
 name: ProxyShield
 version: ${project.version}
 main: de.lucasthcr.bridgesave.proxyshield.paper.PaperMain
-api-version: '1.21'
+api-version: '1.18'
 author: LucasTHCR
 description: Anti-VPN and anti-proxy protection for Paper, Purpur and Spigot, with country filtering, webhook alerts and a silent mode.
 folia-supported: true

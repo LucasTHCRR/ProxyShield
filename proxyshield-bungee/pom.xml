@@ -13,6 +13,12 @@
     <artifactId>proxyshield-bungee</artifactId>
     <name>ProxyShield BungeeCord</name>
 
+    <properties>
+        <maven.compiler.release></maven.compiler.release>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>de.lucasthcr.bridgesave</groupId>
