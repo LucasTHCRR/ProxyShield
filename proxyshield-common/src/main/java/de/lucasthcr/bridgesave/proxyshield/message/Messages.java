@@ -257,6 +257,12 @@ public final class Messages {
       m.put("usage-fpreport", "{prefix}&cUsage: &f/proxyshield fpreport <player|ip>");
       m.put("fp-report-start", "{prefix}&7Building a report. It contains neither the address nor the player name.");
       m.put("fp-report-line", "&7{line}");
+      m.put("kick-appeal-line", "\\n\\n&7Wrongly blocked? Give this code to a staff member: &e{code}");
+      m.put("usage-allow", "{prefix}&cUsage: /proxyshield allow <code> [minutes]");
+      m.put("allow-unknown", "{prefix}&cThat code is not known or has expired. Ask the player for a fresh one.");
+      m.put("allow-done", "{prefix}&aLet {ip} through for {minutes} minutes (player {player}, code {code}).");
+      m.put("allow-failed", "{prefix}&cCould not save the entry: {error}");
+      m.put("help-allow", "&e/proxyshield allow <code> [minutes] &8- &7Let a refused player through with the code from the kick screen");
       m.put("fp-report-footer", "{prefix}&7Copy the lines above into a new issue: &f{url}");
       m.put("help-fpreport", "&e/proxyshield fpreport <player|ip> &8- &7Anonymous report for a wrongly blocked player");
       m.put("help-update", "&e/proxyshield update [install] &8- &7Check for a newer version, or stage it");

@@ -20,6 +20,7 @@ package de.lucasthcr.bridgesave.proxyshield.command;
 
 import de.lucasthcr.bridgesave.proxyshield.ProxyShieldCore;
 import de.lucasthcr.bridgesave.proxyshield.check.AltTracker;
+import de.lucasthcr.bridgesave.proxyshield.check.AppealStore;
 import de.lucasthcr.bridgesave.proxyshield.check.CheckEngine;
 import de.lucasthcr.bridgesave.proxyshield.check.CheckVerdict;
 import de.lucasthcr.bridgesave.proxyshield.config.ShieldConfig;
@@ -54,7 +55,7 @@ public final class CommandHandler {
 
    private static final List<String> SUBCOMMANDS = List.of(
          "help", "info", "providers", "reload", "stats", "check", "lookup", "refresh", "recheck",
-         "whitelist", "blacklist", "alts", "clearcache", "dryrun", "silent", "reporting", "update", "fpreport");
+         "whitelist", "blacklist", "alts", "clearcache", "dryrun", "silent", "reporting", "update", "fpreport", "allow");
 
    private static final List<String> LIST_ACTIONS =
          List.of("add", "remove", "list", "info", "purge");
@@ -123,6 +124,7 @@ public final class CommandHandler {
          case "clearcache" -> doClearCache(sender);
          case "check" -> doCheck(sender, args);
          case "fpreport" -> doFalsePositiveReport(sender, args);
+         case "allow" -> doAllow(sender, args);
          case "lookup" -> doLookup(sender, args);
          case "whitelist" -> doListCommand(sender, args, core.whitelist(), "whitelist");
          case "blacklist" -> doListCommand(sender, args, core.blacklist(), "blacklist");
@@ -194,7 +196,7 @@ public final class CommandHandler {
       send(sender, "help-header", of("version", core.platform().version()));
       for (String key : List.of("help-info", "help-stats", "help-check", "help-lookup",
             "help-whitelist", "help-blacklist", "help-alts", "help-refresh", "help-recheck",
-            "help-clearcache", "help-reporting", "help-update", "help-fpreport", "help-reload", "help-footer")) {
+            "help-clearcache", "help-reporting", "help-update", "help-fpreport", "help-allow", "help-reload", "help-footer")) {
          send(sender, key);
       }
    }
@@ -511,6 +513,37 @@ public final class CommandHandler {
                "weight", String.format(Locale.ROOT, "%.1f", answer.weight()),
                "verdict", verdict,
                "detail", detail.trim()));
+      }
+   }
+
+   /** Lets a refused player through for a while, with the code from the kick screen. */
+   private void doAllow(Sender sender, String[] args) {
+      if (args.length < 2) {
+         send(sender, "usage-allow");
+         return;
+      }
+      Optional<AppealStore.Entry> entry = core.appeals().resolve(args[1]);
+      if (entry.isEmpty()) {
+         send(sender, "allow-unknown");
+         return;
+      }
+      int minutes = core.config().appealAllowMinutes();
+      if (args.length > 2) {
+         try {
+            minutes = Math.max(1, Math.min(10080, Integer.parseInt(args[2])));
+         } catch (NumberFormatException ignored) {
+            send(sender, "usage-allow");
+            return;
+         }
+      }
+      String code = args[1].toUpperCase(Locale.ROOT);
+      try {
+         // An address that is already on the list stays as it is, the player gets through either way.
+         core.whitelist().add(entry.get().ip(), "appeal " + code, sender.name(), minutes * 60_000L);
+         send(sender, "allow-done", of("ip", entry.get().ip(), "minutes", String.valueOf(minutes),
+               "player", entry.get().player(), "code", code));
+      } catch (IOException failure) {
+         send(sender, "allow-failed", of("error", String.valueOf(failure.getMessage())));
       }
    }
 

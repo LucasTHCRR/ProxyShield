@@ -4,6 +4,10 @@
 
 ### Added
 
+- **Appeal codes.** A refused player sees a short code on the kick screen ("PS-K7QM2"). A staff member enters
+  `/proxyshield allow <code> [minutes]` and the address is let through for a while (default 60 minutes). It shows up on
+  the whitelist with the reason "appeal <code>" and removes itself. Codes live in memory, the `appeal` section of the
+  config switches them off or changes the times. Blacklisted and bogon addresses get no code.
 - **`api.clean-settle-ms`** (off by default): an address in a home or mobile network can be let through after this
   many milliseconds on one clean answer. Measured: real players log in about a fifth faster, but open proxies in home
   networks are found less often, so it stays off unless you choose it.

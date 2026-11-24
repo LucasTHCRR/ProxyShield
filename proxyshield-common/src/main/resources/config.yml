@@ -678,6 +678,21 @@ updates:
   auto-update: false
 
 # ============================================================================
+#  Appeal codes
+#
+#  A refused player sees a short code on the kick screen. A staff member enters it with
+#  /proxyshield allow <code> [minutes], and the address is let through for a while (it
+#  appears on the whitelist with the reason "appeal <code>" and removes itself). Codes live
+#  in memory only. Addresses on the blacklist and bogon addresses get no code.
+# ============================================================================
+appeal:
+  enabled: true
+  # How long a code stays valid after the player was refused.
+  code-minutes: 180
+  # How long /proxyshield allow lets the address through when no time is given.
+  allow-minutes: 60
+
+# ============================================================================
 #  Reporting
 #
 #  OFF by default. When on, addresses that were refused as proxies or VPNs by the

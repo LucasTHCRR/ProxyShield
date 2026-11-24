@@ -20,6 +20,7 @@ package de.lucasthcr.bridgesave.proxyshield;
 
 import de.lucasthcr.bridgesave.proxyshield.api.ProxyShieldApi;
 import de.lucasthcr.bridgesave.proxyshield.check.AltTracker;
+import de.lucasthcr.bridgesave.proxyshield.check.AppealStore;
 import de.lucasthcr.bridgesave.proxyshield.check.CheckEngine;
 import de.lucasthcr.bridgesave.proxyshield.check.CheckVerdict;
 import de.lucasthcr.bridgesave.proxyshield.check.ConnectionLimiter;
@@ -71,6 +72,7 @@ public final class ProxyShieldCore {
    private final Platform platform;
    private final ListManager lists;
    private final ManagedIpList whitelist;
+   private volatile AppealStore appeals = new AppealStore(180L * 60_000L);
    private final ManagedIpList blacklist;
    private final Statistics statistics = new Statistics();
    private final JoinHeuristics heuristics = new JoinHeuristics();
@@ -112,6 +114,7 @@ public final class ProxyShieldCore {
       ConfigMigration.run(platform);
       config = ShieldConfig.from(platform.loadConfig());
       config.warnings().forEach(platform::warn);
+      appeals = new AppealStore(config.appealCodeMinutes() * 60_000L);
       messages = Messages.load(platform, config.language());
 
       storage = StorageFactory.create(platform, config);
@@ -509,7 +512,18 @@ public final class ProxyShieldCore {
       values.put("country", verdict.lookup().countryOrUnknown());
       values.put("isp", verdict.lookup().ispOrUnknown());
       values.put("asn", verdict.lookup().asnOrUnknown());
-      return messages.get("kick-message", values);
+      String kick = messages.get("kick-message", values);
+      if (config.appealEnabled() && ip != null && verdict.reason() != CheckVerdict.Reason.BLACKLISTED
+            && verdict.reason() != CheckVerdict.Reason.BOGON) {
+         values.put("code", appeals.issue(ip, player == null ? "unknown" : player));
+         kick = kick + messages.get("kick-appeal-line", values);
+      }
+      return kick;
+   }
+
+   /** Codes of refused players, for /proxyshield allow. */
+   public AppealStore appeals() {
+      return appeals;
    }
 
    public Platform platform() {
