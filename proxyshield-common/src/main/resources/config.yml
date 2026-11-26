@@ -8,7 +8,7 @@
 
 # Marks which release wrote this file. On an update, ProxyShield adds only the options
 # that release brought and never puts back anything you deleted. Do not edit.
-version: 3
+version: 4
 
 settings:
   # Which message file to use. "en" loads messages_en.yml, "de" loads messages_de.yml.
@@ -61,11 +61,27 @@ detection:
     # instead of letting the player in unchecked.
     fallback-block-hosting: true
     # Skip the provider lookup for addresses in end-user networks and keep the quota for the rest.
-    # auto: only while many players join at once (a wave), always: every join, never: off.
+    # never: off (default), auto: only while many players join at once (a wave), always: every join.
     # Faster under load, but a proxy on a home connection is not asked about while it is active.
-    fast-admit: auto
+    fast-admit: never
     # Joins within 10 seconds that count as a wave for "auto".
     fast-admit-burst: 20
+
+  # Local copy of PaperStream Intel (VPN, proxy, Tor, hosting and relay data in one file).
+  # Downloaded every few hours, looked up on the server itself, so no player address leaves it.
+  # A hit with at least block-score refuses the player before any provider is asked.
+  intel:
+    enabled: true
+    source: "https://intel.paperstream.dev/feed/intel-lite.mmdb.gz"
+    # Hours between downloads (1 to 48). Unchanged data is not downloaded again.
+    refresh-hours: 4
+    # Older data no longer refuses VPNs on its own (Tor exits still do), the providers decide.
+    max-age-hours: 72
+    # 100 VPN operator relay, 95 Tor exit, 90 VPN list, 85 community VPN list, 80 open proxy,
+    # 55 hosting. Hosting alone never refuses here, it only helps the providers.
+    block-score: 80
+    # Only use files signed by intel.paperstream.dev. Turn off only for your own mirror without a signature.
+    verify-signature: true
 
   # Check the downloaded IP lists below.
   use-lists: true
@@ -377,14 +393,18 @@ api:
   # slower one. Only switch it on if login speed matters more to you than that. 0 = off.
   clean-settle-ms: 0
 
-  # Per request timeout, and the ceiling for the whole lookup stage of one login.
-  # Whatever has answered by then decides; nobody waits longer than this.
-  timeout-seconds: 4
-  total-timeout-seconds: 6
+  # Per request timeout, and the ceiling for the whole lookup stage of one login, in seconds
+  # (decimals allowed). Whatever has answered by then decides; nobody waits longer than this.
+  # A provider that times out or answers 429 is paused at once and tried again with one request.
+  timeout-seconds: 1.5
+  total-timeout-seconds: 2.5
 
   # How many provider requests may run at the same time, across all logins. A lookup asks every
   # provider at once, so 64 serves about a dozen logins per second even when providers are slow.
   max-parallel: 64
+  # Logins that may wait for providers at the same time. Above this, a login is decided at once from
+  # local data (lists, PaperStream Intel, network class) instead of queueing behind a wave.
+  max-waiting-logins: 256
 
   # How long an answer stays cached. Flagged addresses are kept much longer:
   # a confirmed VPN range stays one for days, while "looked clean an hour ago"
@@ -419,10 +439,11 @@ api:
     # Strongest keyless ones first, measured in the public benchmark.
 
     # PaperStream's own service: network feed, public lists and the addresses other ProxyShield
-    # servers reported. No key, 600 requests a minute per address.
+    # servers reported. No key needed. Most addresses are already answered by the local copy
+    # (detection.intel), this asks the service about the rest.
     paperstream:
       enabled: true
-      weight: 1.0
+      weight: 1.5
 
     # The strongest keyless service in the public benchmark. 250 requests a minute per address
     # without a key, which is plenty with staged lookups. Run by Zowi (api.zowi.gay).
@@ -431,32 +452,35 @@ api:
       weight: 1.5
       key: ""
 
-    # Proxy, VPN, Tor, cloud and Spamhaus data. Free and unlimited.
+    # Proxy, VPN, Tor, cloud and Spamhaus data. Free and unlimited. Also lists hosting and cloud
+    # ranges, so it only counts a little: two weak providers alone cannot reach required-score.
     blackbox:
       enabled: true
-      weight: 1.0
+      weight: 0.6
 
-    # Plain true/false answer.
+    # Plain true/false answer. Wrong now and then, so it only counts a little.
     ip-check:
       enabled: true
-      weight: 1.0
+      weight: 0.6
 
     iplocate:
       enabled: true
       weight: 1.5
       key: ""
 
-    # The classic. HTTPS only on paid plans, hence plain http.
-    ip-api:
-      enabled: true
-      weight: 1.0
-
-    iprisk:
-      enabled: true
-      weight: 1.0
-
-    # Flags nothing without a key in the public benchmark, so it only costs a request.
+    # Fast and keyless, no wrong blocks in the public benchmark.
     ipquery:
+      enabled: true
+      weight: 1.0
+
+    # The classic. HTTPS only on paid plans, hence plain http, and the free use is non-commercial
+    # only. Off by default for both reasons.
+    ip-api:
+      enabled: false
+      weight: 1.0
+
+    # Finds only a small share of VPNs in the public benchmark.
+    iprisk:
       enabled: false
       weight: 1.0
 

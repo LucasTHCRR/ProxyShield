@@ -31,3 +31,5 @@ Thumbs.db
 
 # graphify knowledge graph output
 graphify-out/
+proxyshield-common/src/main/resources/intel-snapshot.mmdb.gz
+proxyshield-common/src/test/resources/intel-snapshot.sig

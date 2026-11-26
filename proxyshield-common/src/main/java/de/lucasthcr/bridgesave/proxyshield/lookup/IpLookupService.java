@@ -48,10 +48,11 @@ public final class IpLookupService implements LookupProvider {
    private static final String USER_AGENT = "ProxyShield/2.2";
 
    /** Consecutive failures before the endpoint is skipped for a while. */
-   private static final int BREAKER_THRESHOLD = 5;
+   private static final int BREAKER_THRESHOLD = 3;
 
    /** How long a tripped endpoint stays skipped. */
-   private static final long BREAKER_COOLDOWN_MILLIS = 120_000L;
+   private static final long BREAKER_COOLDOWN_MILLIS = 30_000L;
+   private static final long BREAKER_MAX_COOLDOWN_MILLIS = 30 * 60_000L;
 
    /** Redirects to follow before giving up, enough for a http-to-https hop and a path move. */
    private static final int MAX_REDIRECTS = 3;
@@ -70,12 +71,14 @@ public final class IpLookupService implements LookupProvider {
    private final AtomicLong failures = new AtomicLong();
    private final AtomicLong consecutiveFailures = new AtomicLong();
    private final AtomicLong breakerOpenUntil = new AtomicLong();
+   private final AtomicBoolean probing = new AtomicBoolean();
+   private final AtomicLong cooldownMillis = new AtomicLong(BREAKER_COOLDOWN_MILLIS);
    private final AtomicLong totalLatencyMillis = new AtomicLong();
 
    public IpLookupService(Platform platform, ShieldConfig config, ProviderDefinition definition) {
       this.platform = platform;
       this.definition = definition;
-      this.timeoutMillis = config.apiTimeoutSeconds() * 1000;
+      this.timeoutMillis = config.apiTimeoutMillis();
       this.limiter = new TokenBucket(definition.rateLimitPerMinute());
       this.debug = config.debug();
    }
@@ -112,6 +115,15 @@ public final class IpLookupService implements LookupProvider {
     */
    @Override
    public LookupResult lookup(String ip) {
+      return lookup(ip, Long.MAX_VALUE);
+   }
+
+   // Mit Frist: die Anfrage bekommt nie mehr Zeit als bis zum Gesamtbudget uebrig ist
+   public LookupResult lookup(String ip, long deadlineMillis) {
+      long left = deadlineMillis == Long.MAX_VALUE ? timeoutMillis : deadlineMillis - System.currentTimeMillis();
+      if (left < 50) {
+         return LookupResult.failed("no time left in the lookup budget");
+      }
       if (breakerOpen()) {
          return LookupResult.failed("skipped, endpoint is in cooldown after repeated failures");
       }
@@ -122,21 +134,57 @@ public final class IpLookupService implements LookupProvider {
       }
 
       long started = System.currentTimeMillis();
-      LookupResult result = query(ip);
+      Outcome outcome = new Outcome((int) Math.min(timeoutMillis, left));
+      LookupResult result = query(definition.url(ip), ip, 0, outcome);
       totalLatencyMillis.addAndGet(System.currentTimeMillis() - started);
       queries.incrementAndGet();
 
       if (result.resolved()) {
          consecutiveFailures.set(0);
+         if (probing.compareAndSet(true, false)) {
+            breakerOpenUntil.set(0L);
+            cooldownMillis.set(BREAKER_COOLDOWN_MILLIS);
+            platform.info("Lookup provider " + definition.id() + " answers again.");
+         }
       } else {
          failures.incrementAndGet();
-         tripBreakerIfNeeded();
+         tripBreakerIfNeeded(outcome);
       }
       return result;
    }
 
-   private LookupResult query(String ip) {
-      return query(definition.url(ip), ip, 0);
+   // Was beim Request schiefging: Timeout und 429 oeffnen den Breaker sofort
+   private static final class Outcome {
+      final int timeoutMillis;
+      boolean tripNow;
+      long retryAfterMillis;
+
+      Outcome(int timeoutMillis) {
+         this.timeoutMillis = timeoutMillis;
+      }
+   }
+
+   private String redact(String text) {
+      if (text == null) {
+         return "";
+      }
+      String out = text.replaceAll("https?://([^/\\s:]+)[^\\s]*", "$1");
+      String key = definition.key();
+      if (key != null && !key.isBlank()) {
+         out = out.replace(key, "***");
+      }
+      return out;
+   }
+
+   private static long retryAfter(String header) {
+      if (header == null) {
+         return 0L;
+      }
+      try {
+         return Math.min(Long.parseLong(header.trim()), 3600L) * 1000L;
+      } catch (NumberFormatException notSeconds) {
+         return 60_000L;
+      }
    }
 
    /**
@@ -147,13 +195,15 @@ public final class IpLookupService implements LookupProvider {
     * {@code 308 Permanent Redirect}, therefore looked like a hard failure and got its provider
     * dropped into the circuit breaker for no reason.
     */
-   private LookupResult query(String endpoint, String ip, int hop) {
+   private LookupResult query(String endpoint, String ip, int hop, Outcome outcome) {
       HttpURLConnection connection = null;
+      boolean reusable = false;
       try {
          URL url = URI.create(endpoint).toURL();
          connection = (HttpURLConnection) url.openConnection();
-         connection.setConnectTimeout(timeoutMillis);
-         connection.setReadTimeout(timeoutMillis);
+         connection.setInstanceFollowRedirects(false);
+         connection.setConnectTimeout(outcome.timeoutMillis);
+         connection.setReadTimeout(outcome.timeoutMillis);
          connection.setRequestProperty("User-Agent", USER_AGENT);
          connection.setRequestProperty("Accept", "application/json");
          if (definition.keyStyle() == ProviderDefinition.KeyStyle.HEADER
@@ -173,9 +223,19 @@ public final class IpLookupService implements LookupProvider {
             if (hop >= MAX_REDIRECTS) {
                return LookupResult.failed("too many redirects");
             }
-            return query(URI.create(endpoint).resolve(location).toString(), ip, hop + 1);
+            URI from = URI.create(endpoint);
+            URI target = from.resolve(location);
+            // Nur zum selben Host und nie von https auf http, sonst geht der Key an Fremde
+            boolean sameHost = target.getHost() != null && target.getHost().equalsIgnoreCase(from.getHost());
+            boolean downgrade = "https".equalsIgnoreCase(from.getScheme()) && !"https".equalsIgnoreCase(target.getScheme());
+            if (!sameHost || downgrade) {
+               return LookupResult.failed("refused redirect to another host or to plain http");
+            }
+            return query(target.toString(), ip, hop + 1, outcome);
          }
          if (status == 429) {
+            outcome.tripNow = true;
+            outcome.retryAfterMillis = retryAfter(connection.getHeaderField("Retry-After"));
             return LookupResult.failed("provider rate limited us (HTTP 429)");
          }
          if (status == 401 || status == 403) {
@@ -186,17 +246,22 @@ public final class IpLookupService implements LookupProvider {
          }
 
          String body = readBody(connection);
+         reusable = true;
          LookupResult parsed = parse(body, ip);
          if (debug) {
             platform.info("[debug] " + definition.id() + " for " + ip + " -> " + summary(parsed)
                   + " | raw: " + truncate(body));
          }
          return parsed;
+      } catch (java.net.SocketTimeoutException timeout) {
+         outcome.tripNow = true;
+         return LookupResult.failed("timed out after " + outcome.timeoutMillis + " ms");
       } catch (IOException | RuntimeException failure) {
          return LookupResult.failed(failure.getClass().getSimpleName() + ": "
-               + failure.getMessage());
+               + redact(failure.getMessage()));
       } finally {
-         if (connection != null) {
+         // Vollstaendig gelesene Verbindungen bleiben offen und werden wiederverwendet (Keep-Alive)
+         if (connection != null && !reusable) {
             connection.disconnect();
          }
       }
@@ -413,22 +478,25 @@ public final class IpLookupService implements LookupProvider {
          return false;
       }
       if (System.currentTimeMillis() >= until) {
-         // Cooldown elapsed: let one request through and see whether the endpoint recovered.
-         breakerOpenUntil.compareAndSet(until, 0L);
-         consecutiveFailures.set(0);
-         return false;
+         // Pause vorbei: genau eine Probe darf durch, alle anderen warten weiter
+         return !probing.compareAndSet(false, true);
       }
       return true;
    }
 
-   private void tripBreakerIfNeeded() {
-      if (consecutiveFailures.incrementAndGet() < BREAKER_THRESHOLD) {
+   private void tripBreakerIfNeeded(Outcome outcome) {
+      boolean probeFailed = probing.compareAndSet(true, false);
+      if (!probeFailed && !outcome.tripNow && consecutiveFailures.incrementAndGet() < BREAKER_THRESHOLD) {
          return;
       }
-      if (breakerOpenUntil.getAndSet(System.currentTimeMillis() + BREAKER_COOLDOWN_MILLIS) == 0L) {
-         platform.warn("Lookup provider " + definition.id() + " (" + host() + ") failed "
-               + BREAKER_THRESHOLD + " times in a row and is skipped for "
-               + (BREAKER_COOLDOWN_MILLIS / 1000L) + "s. Logins are not delayed by it meanwhile.");
+      long cooldown = probeFailed
+            ? cooldownMillis.updateAndGet(c -> Math.min(c * 2, BREAKER_MAX_COOLDOWN_MILLIS))
+            : cooldownMillis.get();
+      cooldown = Math.max(cooldown, outcome.retryAfterMillis);
+      consecutiveFailures.set(0);
+      if (breakerOpenUntil.getAndSet(System.currentTimeMillis() + cooldown) == 0L) {
+         platform.warn("Lookup provider " + definition.id() + " (" + host() + ") is skipped for "
+               + (cooldown / 1000L) + "s after failing. Logins are not delayed by it meanwhile.");
       }
    }
 
@@ -440,7 +508,7 @@ public final class IpLookupService implements LookupProvider {
    /** Whether the endpoint is currently being skipped, for {@code /proxyshield info}. */
    public boolean tripped() {
       long until = breakerOpenUntil.get();
-      return until != 0L && System.currentTimeMillis() < until;
+      return until != 0L && (System.currentTimeMillis() < until || probing.get());
    }
 
    public long rateLimitedCount() {

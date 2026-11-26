@@ -166,10 +166,17 @@ field paths - see the commented example at the bottom of the `providers` section
 
 ### PaperStream Intel
 
-PaperStream Intel is our own free anti-VPN service and the first provider in the list. It answers
-from a network feed that is rebuilt every night, from public VPN, datacenter, Tor and proxy lists,
-from the server lists the VPN operators publish, and from addresses that other ProxyShield servers
-reported. No key and no account, 600 requests a minute per address.
+PaperStream Intel is our own free anti-VPN service. ProxyShield downloads a signed copy of its data
+every 4 hours (`detection.intel`, about 10 MB) and looks addresses up on the server itself, in
+microseconds and without sending the player's address anywhere. VPN servers, Tor exits and open
+proxies are refused right there, before any provider is asked. A copy ships inside the jar, so a
+fresh install is protected from the first second. Hosting ranges and private relays (iCloud, WARP)
+never refuse a player on their own.
+
+The data comes from the server lists the VPN operators publish, the official Tor and cloud ranges,
+a nightly network feed, more than fifty public VPN, proxy and datacenter lists, and the addresses
+other ProxyShield servers reported. The service is also the first online provider, for the
+addresses the local copy does not know. No key and no account.
 
 - Look up any address or test your own connection: [paperstream.dev/vpn](https://paperstream.dev/vpn)
 - API for your own plugin, bot or website: [paperstream.dev/api](https://paperstream.dev/api)
@@ -344,6 +351,19 @@ from an older version keeps working after an update.
 
 ---
 
+### Who receives a player's address
+
+Out of the box an address leaves the server only when the local data does not decide it:
+
+| Recipient | When | Note |
+|---|---|---|
+| PaperStream Intel (intel.paperstream.dev) | unknown addresses, `/proxyshield report` | our own service, no logs of lookups, [privacy policy](https://paperstream.dev/datenschutz) |
+| Zowi (api.zowi.gay) | unknown addresses | keyless, no published data processing agreement |
+| IPQuery, Blackbox, ip-check.net, IPLocate | unknown addresses | keyless, no published data processing agreement |
+
+Lists, the network feed and the Intel copy are downloads without any player data. Turning a provider
+off under `providers` stops it from receiving addresses.
+
 ## Commands
 
 All of these need `proxyshield.admin`. Aliases: `/ps`, `/antivpn`.
@@ -364,6 +384,9 @@ All of these need `proxyshield.admin`. Aliases: `/ps`, `/antivpn`.
 | `/proxyshield recheck` | Re-check everyone online, disconnect whoever fails |
 | `/proxyshield allow <code> [minutes]` | Lets a refused player through for a while, with the code from the kick screen |
 | `/proxyshield fpreport <player\|ip>` | Anonymous report for a wrongly blocked player (version, verdict, network, provider answers) |
+| `/proxyshield doctor` | Checks the setup (data age, lists, providers, unchecked logins) and says what needs attention |
+| `/proxyshield explain <player\|ip>` | Shows step by step why an address is refused or let in |
+| `/proxyshield report <player\|ip> <vpn\|clean>` | Tells PaperStream Intel about a missed VPN or a wrong block |
 | `/proxyshield clearcache` | Drop cached lookup results |
 | `/proxyshield reload` | Re-read `config.yml` and the message file |
 

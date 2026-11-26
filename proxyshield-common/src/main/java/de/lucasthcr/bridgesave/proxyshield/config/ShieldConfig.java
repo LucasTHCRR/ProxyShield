@@ -133,9 +133,10 @@ public final class ShieldConfig {
    private final int appealCodeMinutes;
    private final int appealAllowMinutes;
    private final double requiredScore;
-   private final int apiTimeoutSeconds;
-   private final int apiTotalTimeoutSeconds;
+   private final int apiTimeoutMillis;
+   private final int apiTotalTimeoutMillis;
    private final int apiMaxParallel;
+   private final int apiMaxWaiting;
    private final long apiCacheMinutes;
    private final long apiFlaggedCacheMinutes;
    private final int apiMaxCacheEntries;
@@ -147,6 +148,12 @@ public final class ShieldConfig {
    private final boolean allowResidentialHosting;
    private final double hostingMinScore;
    private final String networkDataSource;
+   private final boolean intelEnabled;
+   private final String intelSource;
+   private final int intelRefreshHours;
+   private final int intelMaxAgeHours;
+   private final int intelBlockScore;
+   private final boolean intelVerify;
    private final boolean updatesNotify;
    private final boolean updatesAutoInstall;
    private final boolean reportingEnabled;
@@ -300,9 +307,11 @@ public final class ShieldConfig {
       this.appealCodeMinutes = clamp(node.getInt("appeal.code-minutes", 180), 5, 10080);
       this.appealAllowMinutes = clamp(node.getInt("appeal.allow-minutes", 60), 1, 10080);
       this.requiredScore = Math.max(0.1, node.getDouble("api.required-score", 1.0));
-      this.apiTimeoutSeconds = clamp(node.getInt("api.timeout-seconds", 4), 1, 60);
-      this.apiTotalTimeoutSeconds = clamp(node.getInt("api.total-timeout-seconds", 6), 1, 120);
+      this.apiTimeoutMillis = clamp((int) Math.round(node.getDouble("api.timeout-seconds", 1.5) * 1000), 200, 60_000);
+      this.apiTotalTimeoutMillis = Math.max(apiTimeoutMillis,
+            clamp((int) Math.round(node.getDouble("api.total-timeout-seconds", 2.5) * 1000), 200, 120_000));
       this.apiMaxParallel = clamp(node.getInt("api.max-parallel", 64), 1, 256);
+      this.apiMaxWaiting = clamp(node.getInt("api.max-waiting-logins", 256), 8, 10_000);
       this.apiCacheMinutes = Math.max(1L, node.getLong("api.cache-minutes", 360L));
       this.apiFlaggedCacheMinutes =
             Math.max(1L, node.getLong("api.flagged-cache-minutes", 1440L));
@@ -316,6 +325,13 @@ public final class ShieldConfig {
             node.getBoolean("detection.allow-residential-hosting", true);
       this.hostingMinScore = Math.max(0.0, node.getDouble("detection.hosting-min-score", 0.5));
       this.networkDataSource = node.getString("detection.network-data.source", "").trim();
+      this.intelEnabled = node.getBoolean("detection.intel.enabled", true);
+      this.intelSource = node.getString("detection.intel.source",
+            "https://intel.paperstream.dev/feed/intel-lite.mmdb.gz").trim();
+      this.intelRefreshHours = clamp(node.getInt("detection.intel.refresh-hours", 4), 1, 48);
+      this.intelMaxAgeHours = clamp(node.getInt("detection.intel.max-age-hours", 72), 6, 720);
+      this.intelBlockScore = clamp(node.getInt("detection.intel.block-score", 80), 50, 101);
+      this.intelVerify = node.getBoolean("detection.intel.verify-signature", true);
       this.updatesNotify = node.getBoolean("updates.notify", true);
       this.updatesAutoInstall = node.getBoolean("updates.auto-update", false);
       this.reportingEnabled = node.getBoolean("reporting.enabled", false);
@@ -324,14 +340,14 @@ public final class ShieldConfig {
             ? reportingTarget.substring(0, reportingTarget.length() - 1) : reportingTarget;
       this.reportingIntervalMinutes = Math.max(1, Math.min(1440, node.getInt("reporting.interval-minutes", 10)));
       this.networkFallbackHosting = node.getBoolean("detection.network-data.fallback-block-hosting", true);
-      String fastAdmit = node.getString("detection.network-data.fast-admit", "auto").trim().toLowerCase(java.util.Locale.ROOT);
+      String fastAdmit = node.getString("detection.network-data.fast-admit", "never").trim().toLowerCase(java.util.Locale.ROOT);
       if (node.getBoolean("detection.network-data.fast-admit-end-user", false)) {
          fastAdmit = "always";
       }
       this.networkFastAdmitMode = switch (fastAdmit) {
          case "always", "true", "on" -> "always";
-         case "never", "false", "off" -> "never";
-         default -> "auto";
+         case "auto" -> "auto";
+         default -> "never";
       };
       this.networkFastAdmitBurst = Math.max(1, node.getInt("detection.network-data.fast-admit-burst", 20));
       this.asnEnabled = node.getBoolean("detection.asn.enabled", true);
@@ -882,8 +898,8 @@ public final class ShieldConfig {
       return out;
    }
 
-   public int apiTimeoutSeconds() {
-      return apiTimeoutSeconds;
+   public int apiTimeoutMillis() {
+      return apiTimeoutMillis;
    }
 
    public long apiCacheMinutes() {
@@ -936,8 +952,12 @@ public final class ShieldConfig {
    }
 
    /** Ceiling on how long the whole lookup stage may take for one login. */
-   public int apiTotalTimeoutSeconds() {
-      return apiTotalTimeoutSeconds;
+   public int apiTotalTimeoutMillis() {
+      return apiTotalTimeoutMillis;
+   }
+
+   public int apiMaxWaiting() {
+      return apiMaxWaiting;
    }
 
    public int apiMaxParallel() {
@@ -980,6 +1000,30 @@ public final class ShieldConfig {
    }
 
    /** URL of the network feed, empty when the feature is off. */
+   public boolean intelEnabled() {
+      return intelEnabled && !intelSource.isEmpty();
+   }
+
+   public String intelSource() {
+      return intelSource;
+   }
+
+   public int intelRefreshHours() {
+      return intelRefreshHours;
+   }
+
+   public int intelMaxAgeHours() {
+      return intelMaxAgeHours;
+   }
+
+   public boolean intelVerify() {
+      return intelVerify;
+   }
+
+   public int intelBlockScore() {
+      return intelBlockScore;
+   }
+
    public String networkDataSource() {
       return networkDataSource;
    }

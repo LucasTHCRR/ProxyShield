@@ -144,6 +144,16 @@ public final class SightingReporter {
       return count.find() ? Integer.parseInt(count.group(1)) : 0;
    }
 
+   // Meldung eines Admins: Adresse ist ein VPN (vpn) oder wurde zu Unrecht gesperrt (clean)
+   public int feedback(String ip, String kind) {
+      if (!de.lucasthcr.bridgesave.proxyshield.net.IpAddresses.isValid(ip)
+            || !(kind.equals("vpn") || kind.equals("clean"))) {
+         return 400;
+      }
+      String body = "{\"install\":\"" + installId() + "\",\"ip\":\"" + ip + "\",\"kind\":\"" + kind + "\"}";
+      return post(config.get().reportingUrl() + "/v1/feedback", body);
+   }
+
    public Status status() {
       ShieldConfig current = config.get();
       return new Status(current.reportingEnabled(), current.reportingUrl(), queue.size(), sent, lastError,

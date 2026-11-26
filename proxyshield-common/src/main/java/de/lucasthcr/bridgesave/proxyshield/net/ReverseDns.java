@@ -81,7 +81,10 @@ public final class ReverseDns {
    public ReverseDns(int timeoutMillis, int maxCacheEntries, long cacheTtlMillis) {
       this.timeoutMillis = Math.max(50, timeoutMillis);
       this.cache = new ExpiringCache<>(maxCacheEntries, cacheTtlMillis);
-      this.resolver = Executors.newCachedThreadPool(daemonThreads());
+      // Begrenzt: bei einer Welle wird rDNS lieber ausgelassen als unbegrenzt Threads zu starten
+      this.resolver = new java.util.concurrent.ThreadPoolExecutor(2, 16, 60L, java.util.concurrent.TimeUnit.SECONDS,
+            new java.util.concurrent.ArrayBlockingQueue<>(256), daemonThreads(),
+            new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
    }
 
    private static ThreadFactory daemonThreads() {

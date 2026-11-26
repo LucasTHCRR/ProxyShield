@@ -24,6 +24,7 @@ import de.lucasthcr.bridgesave.proxyshield.lookup.LookupProvider;
 import de.lucasthcr.bridgesave.proxyshield.lookup.LookupResult;
 import de.lucasthcr.bridgesave.proxyshield.net.IpAddresses;
 import de.lucasthcr.bridgesave.proxyshield.net.ManagedIpList;
+import de.lucasthcr.bridgesave.proxyshield.net.IntelDatabase;
 import de.lucasthcr.bridgesave.proxyshield.net.NetworkData;
 import de.lucasthcr.bridgesave.proxyshield.net.ReverseDns;
 import java.util.ArrayList;
@@ -68,6 +69,7 @@ public final class CheckEngine {
    private final JoinHeuristics heuristics;
    private volatile Predicate<String> listedAsn = asn -> false;
    private volatile NetworkData networks;
+   private volatile IntelDatabase intel;
    private final JoinBurst burst;
 
    public CheckEngine(ShieldConfig config, ListManager lists, LookupProvider lookups,
@@ -93,6 +95,15 @@ public final class CheckEngine {
    public CheckEngine withNetworkData(NetworkData data) {
       this.networks = data;
       return this;
+   }
+
+   public CheckEngine withIntel(IntelDatabase database) {
+      this.intel = database;
+      return this;
+   }
+
+   public IntelDatabase intel() {
+      return intel;
    }
 
    /** Supplies networks blocked by a downloaded list, on top of {@code detection.asn.blocked}. */
@@ -143,8 +154,10 @@ public final class CheckEngine {
          return CheckVerdict.deny(CheckVerdict.Reason.BLACKLISTED, null, LookupResult.UNKNOWN);
       }
 
+      // Vertrauen gilt nicht, wenn die aktuelle Adresse selbst als VPN, Proxy, Tor oder Hosting bekannt ist
       if (config.trustEnabled() && trust != null
-            && trust.trusted(uuid, config.trustMinLogins(), config.trustMinDays())) {
+            && trust.trusted(uuid, config.trustMinLogins(), config.trustMinDays())
+            && !suspiciousForTrust(ip)) {
          return CheckVerdict.allow(CheckVerdict.Reason.TRUSTED_PLAYER);
       }
 
@@ -152,8 +165,18 @@ public final class CheckEngine {
          return CheckVerdict.deny(CheckVerdict.Reason.IP_LIST, null, LookupResult.UNKNOWN);
       }
 
+      IntelDatabase.Hit hit = intelHit(ip);
+      CheckVerdict intelVerdict = intelVerdict(hit);
+      if (intelVerdict != null) {
+         return intelVerdict;
+      }
+
       boolean needsLookup = config.useApi() || config.countryEnabled();
       NetworkData.Network network = networks != null && networks.loaded() ? networks.classify(ip) : null;
+      if (network == null && hit != null && !"unknown".equals(hit.network())) {
+         network = new NetworkData.Network(hit.endUser(), "hosting".equals(hit.network()),
+               "no_users".equals(hit.network()), hit.country(), hit.asn());
+      }
       LookupResult result;
       boolean surge = burst.record();
       boolean fast = switch (config.networkFastAdmitMode()) {
@@ -234,6 +257,38 @@ public final class CheckEngine {
       }
 
       return CheckVerdict.allow(CheckVerdict.Reason.ALLOWED, withSignals(result, score, signals));
+   }
+
+   private boolean suspiciousForTrust(String ip) {
+      if (config.useLists() && lists.matches(ip)) {
+         return true;
+      }
+      IntelDatabase.Hit hit = intelHit(ip);
+      return hit != null && (hit.vpn() || hit.proxy() || hit.tor() || hit.hosting());
+   }
+
+   public IntelDatabase.Hit intelHit(String ip) {
+      IntelDatabase database = intel;
+      return config.intelEnabled() && database != null && database.loaded() ? database.lookup(ip) : null;
+   }
+
+   // Treffer mit hoher Wertung entscheiden lokal, ohne einen Provider zu fragen
+   public CheckVerdict intelVerdict(IntelDatabase.Hit hit) {
+      if (hit == null || hit.score() < config.intelBlockScore()) {
+         return null;
+      }
+      boolean stale = intel == null || intel.stale(config.intelMaxAgeHours());
+      LookupResult result = LookupResult.of(hit.vpn() || hit.proxy(), hit.hosting(), hit.tor(),
+            hit.country(), null, null, hit.asnName(), null, hit.score() / 100.0,
+            List.of("paperstream-intel"));
+      String detail = "PaperStream Intel: " + String.join(", ", hit.reasons());
+      if (hit.tor() && config.blockTor()) {
+         return CheckVerdict.deny(CheckVerdict.Reason.TOR, detail, result);
+      }
+      if (!stale && (hit.vpn() || hit.proxy()) && config.blockProxy()) {
+         return CheckVerdict.deny(CheckVerdict.Reason.PROXY, detail, result);
+      }
+      return null;
    }
 
    /**

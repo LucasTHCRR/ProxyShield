@@ -211,7 +211,7 @@ class ShieldConfigTest {
 
       assertEquals(1L, config.listUpdateIntervalHours());
       assertEquals(300, config.listTimeoutSeconds());
-      assertEquals(1, config.apiTimeoutSeconds());
+      assertEquals(200, config.apiTimeoutMillis());
       assertEquals(100, config.apiMaxCacheEntries());
       assertEquals(1, config.apiRateLimitPerMinute());
       assertEquals(1L, config.apiCacheMinutes());

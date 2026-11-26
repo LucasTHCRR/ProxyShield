@@ -91,6 +91,8 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
    private final AtomicLong coalesced = new AtomicLong();
    private final AtomicLong budgetExceeded = new AtomicLong();
    private final AtomicLong sharedHits = new AtomicLong();
+   private final AtomicLong overloaded = new AtomicLong();
+   private java.util.concurrent.Semaphore waiting = new java.util.concurrent.Semaphore(256);
 
    public FailoverLookupService(Platform platform, ShieldConfig config) {
       this(platform, config, null, null);
@@ -121,7 +123,8 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       this.cleanSettleMillis = config.apiCleanSettleMillis();
       this.cleanTtlMillis = config.apiCacheMinutes() * 60_000L;
       this.flaggedTtlMillis = config.apiFlaggedCacheMinutes() * 60_000L;
-      this.totalBudgetMillis = config.apiTotalTimeoutSeconds() * 1000L;
+      this.totalBudgetMillis = config.apiTotalTimeoutMillis();
+      this.waiting = new java.util.concurrent.Semaphore(config.apiMaxWaiting());
 
       List<IpLookupService> built = new ArrayList<>();
       List<String> unusable = new ArrayList<>();
@@ -217,6 +220,19 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
          return LookupResult.failed("no lookup provider configured");
       }
 
+      // Zu viele wartende Logins: nicht anstellen, sondern sofort lokal entscheiden lassen
+      if (!waiting.tryAcquire()) {
+         overloaded.incrementAndGet();
+         return LookupResult.failed("too many logins waiting for providers");
+      }
+      try {
+         return lookupAdmitted(ip, key, endUserNetwork);
+      } finally {
+         waiting.release();
+      }
+   }
+
+   private LookupResult lookupAdmitted(String ip, String key, boolean endUserNetwork) {
       CompletableFuture<LookupResult> fresh = new CompletableFuture<>();
       CompletableFuture<LookupResult> running = inFlight.putIfAbsent(key, fresh);
       if (running != null) {
@@ -227,6 +243,12 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       }
 
       try {
+         // Der vorige Anfrager kann zwischen Cache-Blick und putIfAbsent fertig geworden sein
+         Optional<LookupResult> late = cache.get(key);
+         if (late.isPresent()) {
+            fresh.complete(late.get());
+            return late.get();
+         }
          Round round = mode == ShieldConfig.LookupMode.FAILOVER
                ? new Round(failover(ip), true)
                : consensus(ip, endUserNetwork ? cleanSettleMillis : 0);
@@ -277,7 +299,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
          }
 
          IpLookupService provider = providers.get(i);
-         LookupResult result = provider.lookup(ip);
+         LookupResult result = provider.lookup(ip, deadline);
          if (result.resolved()) {
             if (i > 0) {
                failovers.incrementAndGet();
@@ -676,6 +698,10 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
    }
 
    /** Answers served from the shared store instead of a provider. */
+   public long overloadedCount() {
+      return overloaded.get();
+   }
+
    public long sharedHitCount() {
       return sharedHits.get();
    }

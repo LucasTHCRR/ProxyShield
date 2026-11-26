@@ -67,7 +67,9 @@ class ConfigMigrationTest {
       assertTrue(upgraded.contains("    paperstream:\n"), "new provider");
       assertFalse(upgraded.contains(ZOWI), "the deleted provider stays deleted");
       assertTrue(upgraded.contains("hosting-min-score: 1.5"), "the admin's value stays");
-      assertTrue(upgraded.contains("version: 3"));
+      assertTrue(upgraded.contains("version: 4"));
+      assertTrue(upgraded.contains("\n  intel:\n"), "new section intel");
+      assertFalse(upgraded.contains("fast-admit: auto"), "fast-admit is off from version 4");
       assertTrue(Files.exists(tempDir.resolve("config.yml.bak")));
       assertTrue(platform.infos().stream().anyMatch(line -> line.contains("upgraded from version")));
    }
@@ -103,7 +105,7 @@ class ConfigMigrationTest {
 
       String upgraded = migrate(resource("config-history/1.yml"), platform);
 
-      assertTrue(upgraded.contains("version: 3"));
+      assertTrue(upgraded.contains("version: 4"));
       assertTrue(upgraded.contains("\nreporting:\n"));
       assertTrue(platform.warnings().isEmpty(), platform.warnings().toString());
    }

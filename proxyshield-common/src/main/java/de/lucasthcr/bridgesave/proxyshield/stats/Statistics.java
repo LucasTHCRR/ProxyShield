@@ -30,6 +30,9 @@ public final class Statistics {
    private final AtomicLong checked = new AtomicLong();
    private final AtomicLong blocked = new AtomicLong();
    private final AtomicLong wouldHaveBlocked = new AtomicLong();
+   private final AtomicLong uncheckedAdmitted = new AtomicLong();
+   private final AtomicLong intelDecided = new AtomicLong();
+   private final AtomicLong uncheckedAtLastLog = new AtomicLong();
    private final Map<CheckVerdict.Reason, AtomicLong> byReason =
          new EnumMap<>(CheckVerdict.Reason.class);
    private final AtomicLong blockedAtLastReport = new AtomicLong();
@@ -44,6 +47,15 @@ public final class Statistics {
    public void record(CheckVerdict verdict, boolean enforced) {
       checked.incrementAndGet();
       byReason.get(verdict.reason()).incrementAndGet();
+      de.lucasthcr.bridgesave.proxyshield.lookup.LookupResult lookup = verdict.lookup();
+      // Durchgelassen, obwohl kein Dienst und keine Liste geantwortet hat
+      if (!verdict.blocked() && verdict.reason() == CheckVerdict.Reason.ALLOWED && lookup != null
+            && lookup != de.lucasthcr.bridgesave.proxyshield.lookup.LookupResult.UNKNOWN && !lookup.resolved()) {
+         uncheckedAdmitted.incrementAndGet();
+      }
+      if (verdict.blocked() && lookup != null && lookup.sources().contains("paperstream-intel")) {
+         intelDecided.incrementAndGet();
+      }
       if (verdict.blocked()) {
          if (enforced) {
             blocked.incrementAndGet();
@@ -51,6 +63,20 @@ public final class Statistics {
             wouldHaveBlocked.incrementAndGet();
          }
       }
+   }
+
+   public long uncheckedAdmitted() {
+      return uncheckedAdmitted.get();
+   }
+
+   public long intelDecided() {
+      return intelDecided.get();
+   }
+
+   // Neue ungepruefte Logins seit dem letzten Aufruf
+   public long drainUncheckedSinceLog() {
+      long now = uncheckedAdmitted.get();
+      return now - uncheckedAtLastLog.getAndSet(now);
    }
 
    public long checked() {

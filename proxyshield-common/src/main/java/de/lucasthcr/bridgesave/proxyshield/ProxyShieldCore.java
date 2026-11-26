@@ -33,6 +33,7 @@ import de.lucasthcr.bridgesave.proxyshield.list.ListManager;
 import de.lucasthcr.bridgesave.proxyshield.lookup.LookupResult;
 import de.lucasthcr.bridgesave.proxyshield.message.Messages;
 import de.lucasthcr.bridgesave.proxyshield.lookup.FailoverLookupService;
+import de.lucasthcr.bridgesave.proxyshield.net.IntelDatabase;
 import de.lucasthcr.bridgesave.proxyshield.net.NetworkData;
 import de.lucasthcr.bridgesave.proxyshield.net.ManagedIpList;
 import de.lucasthcr.bridgesave.proxyshield.net.ReverseDns;
@@ -67,7 +68,7 @@ public final class ProxyShieldCore {
    private static final long HEARTBEAT_SECONDS = 300L;
 
    /** Grace period before the first feed download, to stay clear of the startup rush. */
-   private static final long STARTUP_DELAY_SECONDS = 8L;
+   private static final long STARTUP_DELAY_MILLIS = 2000L;
 
    private final Platform platform;
    private final ListManager lists;
@@ -80,6 +81,8 @@ public final class ProxyShieldCore {
    private final AltTracker alts;
    private final AsnFeed asnFeed;
    private final NetworkData networks;
+   private final IntelDatabase intel;
+   private final java.util.concurrent.atomic.AtomicBoolean intelBusy = new java.util.concurrent.atomic.AtomicBoolean();
    private final SightingReporter reporter;
    private final UpdateService updates;
    private final Set<UUID> restricted = ConcurrentHashMap.newKeySet();
@@ -104,12 +107,14 @@ public final class ProxyShieldCore {
       this.alts = new AltTracker(platform.dataFolder().resolve("alts.tsv"));
       this.asnFeed = new AsnFeed(platform);
       this.networks = new NetworkData(platform);
+      this.intel = new IntelDatabase(platform);
       this.reporter = new SightingReporter(platform, () -> config);
       this.updates = new UpdateService(platform, () -> config);
    }
 
    /** Reads the config, restores caches and starts the background work. */
    public void start() {
+      long startedNanos = System.nanoTime();
       platform.saveDefaultConfig();
       ConfigMigration.run(platform);
       config = ShieldConfig.from(platform.loadConfig());
@@ -135,6 +140,7 @@ public final class ProxyShieldCore {
       alts.load();
       asnFeed.loadFromDisk();
       networks.loadFromDisk();
+      intel.loadFromDisk();
 
       if (storage.shared()) {
          platform.info("Verdicts and trust are shared through " + storage.name()
@@ -163,7 +169,9 @@ public final class ProxyShieldCore {
       announceReporting(config);
 
       ProxyShieldApi.bind(this);
-      platform.info("ProxyShield " + platform.version() + " enabled on " + platform.name() + ".");
+      platform.info("ProxyShield " + platform.version() + " enabled on " + platform.name() + " in "
+            + (System.nanoTime() - startedNanos) / 1_000_000L + " ms (protection from cache: "
+            + lists.ranges().rangeCount() + " list ranges, PaperStream Intel " + (intel.loaded() ? "loaded" : "not yet") + ").");
    }
 
    public void shutdown() {
@@ -210,9 +218,12 @@ public final class ProxyShieldCore {
    private void initialRefresh() {
       // With a cached copy the server is already protected, so the download can wait for the
       // startup rush. On a first start nothing is, so it begins at once.
-      long delaySeconds = lists.ranges().isEmpty() ? 0L : STARTUP_DELAY_SECONDS;
+      refreshIntel();
+      // Kurz und zufaellig warten, damit nicht alle Server gleichzeitig laden
+      long delayMillis = lists.ranges().isEmpty() ? 0L
+            : java.util.concurrent.ThreadLocalRandom.current().nextLong(STARTUP_DELAY_MILLIS + 1);
       try {
-         Thread.sleep(delaySeconds * 1000L);
+         Thread.sleep(delayMillis);
       } catch (InterruptedException interrupted) {
          Thread.currentThread().interrupt();
          return;
@@ -239,7 +250,7 @@ public final class ProxyShieldCore {
 
    private void rebuildEngine() {
       engine = new CheckEngine(config, lists, lookups, whitelist, blacklist, reverseDns, trust,
-            heuristics).withAsnFeed(asnFeed::contains).withNetworkData(networks);
+            heuristics).withAsnFeed(asnFeed::contains).withNetworkData(networks).withIntel(intel);
    }
 
    /** Re-reads config.yml and rebuilds everything derived from it. */
@@ -342,6 +353,16 @@ public final class ProxyShieldCore {
          asnFeed.refresh(current.asnSources(), current.listTimeoutSeconds());
       }
 
+      if (current.intelEnabled() && intel.due(current.intelRefreshHours() * 3_600_000L)) {
+         refreshIntel();
+      }
+
+      long unchecked = statistics.drainUncheckedSinceLog();
+      if (unchecked > 0) {
+         platform.warn(unchecked + " player(s) were let in unchecked in the last minutes (no provider answered). "
+               + "/proxyshield doctor shows why.");
+      }
+
       lookups.purgeExpired();
       heuristics.purgeExpired();
       limiter.purgeExpired(current.limiterWindowMinutes());
@@ -352,6 +373,22 @@ public final class ProxyShieldCore {
       storage.flush();
       trust.saveIfDue();
       alerts.rotateLogIfLarge();
+   }
+
+   public boolean refreshIntel() {
+      ShieldConfig current = config;
+      if (!current.intelEnabled() || !intelBusy.compareAndSet(false, true)) {
+         return intel.loaded();
+      }
+      try {
+         return intel.refresh(current.intelSource(), current.listTimeoutSeconds(), current.intelVerify());
+      } finally {
+         intelBusy.set(false);
+      }
+   }
+
+   public IntelDatabase intel() {
+      return intel;
    }
 
    /** Downloads every configured list source. Blocking; always call from an async context. */

@@ -213,7 +213,7 @@ public final class ProviderCatalog {
             .country("country")
             .asn("asn")
             .weight(1.0)
-            .rateLimit(500)
+            .rateLimit(1000)
             .build());
 
       // feature=security returns only the verdict fields, which is all that is read here. Free

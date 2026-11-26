@@ -55,7 +55,7 @@ public final class CommandHandler {
 
    private static final List<String> SUBCOMMANDS = List.of(
          "help", "info", "providers", "reload", "stats", "check", "lookup", "refresh", "recheck",
-         "whitelist", "blacklist", "alts", "clearcache", "dryrun", "silent", "reporting", "update", "fpreport", "allow");
+         "whitelist", "blacklist", "alts", "clearcache", "dryrun", "silent", "reporting", "update", "fpreport", "allow", "doctor", "explain", "report");
 
    private static final List<String> LIST_ACTIONS =
          List.of("add", "remove", "list", "info", "purge");
@@ -125,6 +125,9 @@ public final class CommandHandler {
          case "check" -> doCheck(sender, args);
          case "fpreport" -> doFalsePositiveReport(sender, args);
          case "allow" -> doAllow(sender, args);
+         case "doctor" -> doDoctor(sender);
+         case "explain" -> doExplain(sender, args);
+         case "report" -> doReport(sender, args);
          case "lookup" -> doLookup(sender, args);
          case "whitelist" -> doListCommand(sender, args, core.whitelist(), "whitelist");
          case "blacklist" -> doListCommand(sender, args, core.blacklist(), "blacklist");
@@ -169,12 +172,15 @@ public final class CommandHandler {
          return filter(DURATIONS, args[3]);
       }
       if (args.length == 2 && (sub.equals("check") || sub.equals("lookup")
-            || sub.equals("alts") || sub.equals("fpreport"))) {
+            || sub.equals("alts") || sub.equals("fpreport") || sub.equals("explain") || sub.equals("report"))) {
          List<String> names = new ArrayList<>();
          for (ShieldPlayer online : core.platform().onlinePlayers()) {
             names.add(online.name());
          }
          return filter(names, args[1]);
+      }
+      if (args.length == 3 && sub.equals("report")) {
+         return filter(List.of("vpn", "clean"), args[2]);
       }
       return List.of();
    }
@@ -196,7 +202,7 @@ public final class CommandHandler {
       send(sender, "help-header", of("version", core.platform().version()));
       for (String key : List.of("help-info", "help-stats", "help-check", "help-lookup",
             "help-whitelist", "help-blacklist", "help-alts", "help-refresh", "help-recheck",
-            "help-clearcache", "help-reporting", "help-update", "help-fpreport", "help-allow", "help-reload", "help-footer")) {
+            "help-clearcache", "help-reporting", "help-update", "help-fpreport", "help-allow", "help-doctor", "help-explain", "help-report", "help-reload", "help-footer")) {
          send(sender, key);
       }
    }
@@ -248,6 +254,9 @@ public final class CommandHandler {
       send(sender, "info-storage", of(
             "storage", core.storage().name(),
             "shared", onOff(core.storage().shared())));
+      send(sender, "info-decisions", of(
+            "intel", String.valueOf(core.statistics().intelDecided()),
+            "unchecked", String.valueOf(core.statistics().uncheckedAdmitted())));
       send(sender, "info-signals", of(
             "asn", onOff(config.asnEnabled()),
             "rdns", onOff(config.rdnsEnabled()),
@@ -341,6 +350,7 @@ public final class CommandHandler {
 
       send(sender, "refresh-start");
       core.platform().runAsync(() -> {
+         core.refreshIntel();
          if (core.refreshLists()) {
             send(sender, "refresh-done", of(
                   "ranges", String.valueOf(core.lists().ranges().rangeCount()),
@@ -439,8 +449,7 @@ public final class CommandHandler {
       core.platform().runAsync(() -> {
          // Deliberately without the join heuristics: an admin running /proxyshield check is not a
          // login, and counting it would move the very rate windows the command is meant to report.
-         CheckEngine engine = new CheckEngine(core.config(), core.lists(), core.lookups(),
-               core.whitelist(), core.blacklist(), core.reverseDns(), core.trust(), null);
+         CheckEngine engine = adminEngine();
          CheckVerdict verdict = engine.check(target, null, ip, CheckEngine.PermissionProbe.NONE);
          LookupResult lookup = verdict.lookup();
 
@@ -855,6 +864,178 @@ public final class CommandHandler {
    }
 
    /** Accepts an IP literal directly, otherwise resolves an online player's address. */
+   private CheckEngine adminEngine() {
+      return new CheckEngine(core.config(), core.lists(), core.lookups(), core.whitelist(), core.blacklist(),
+            core.reverseDns(), core.trust(), null).withNetworkData(core.networkData()).withIntel(core.intel());
+   }
+
+   private static String hoursAgo(long epochMillis) {
+      if (epochMillis <= 0) {
+         return "?";
+      }
+      return String.format(Locale.ROOT, "%.1f", (System.currentTimeMillis() - epochMillis) / 3_600_000.0);
+   }
+
+   private void doDoctor(Sender sender) {
+      ShieldConfig config = core.config();
+      send(sender, "doctor-header");
+      int problems = 0;
+
+      if (!config.intelEnabled()) {
+         send(sender, "doctor-intel-off");
+      } else if (!core.intel().loaded()) {
+         send(sender, "doctor-intel-missing");
+         problems++;
+      } else if (core.intel().stale(config.intelMaxAgeHours())) {
+         send(sender, "doctor-intel-stale", of("hours", hoursAgo(core.intel().buildEpoch() * 1000L)));
+         problems++;
+      } else {
+         send(sender, "doctor-intel-ok", of("hours", hoursAgo(core.intel().buildEpoch() * 1000L),
+               "nodes", String.valueOf(core.intel().nodeCount())));
+      }
+
+      if (config.useLists()) {
+         if (core.lists().ranges().isEmpty()) {
+            send(sender, "doctor-lists-empty");
+            problems++;
+         } else {
+            send(sender, "doctor-lists-ok", of("sources", String.valueOf(core.lists().sourceCount()),
+                  "failed", String.valueOf(core.lists().failedSourceCount()),
+                  "hours", hoursAgo(core.lists().lastRefreshMillis())));
+         }
+      }
+
+      if (!config.networkDataSource().isEmpty() && !core.networkData().loaded()) {
+         send(sender, "doctor-network-missing");
+         problems++;
+      }
+
+      if (config.useApi()) {
+         List<IpLookupService> providers = core.lookups().providers();
+         List<String> tripped = new ArrayList<>();
+         for (IpLookupService provider : providers) {
+            if (provider.tripped()) {
+               tripped.add(provider.id());
+            }
+         }
+         if (providers.isEmpty()) {
+            send(sender, "doctor-providers-none");
+            problems++;
+         } else if (!tripped.isEmpty()) {
+            send(sender, "doctor-providers-tripped", of("ids", String.join(", ", tripped)));
+            problems++;
+         } else {
+            send(sender, "doctor-providers-ok", of("count", String.valueOf(providers.size())));
+         }
+      }
+
+      long unchecked = core.statistics().uncheckedAdmitted();
+      if (unchecked > 0) {
+         send(sender, "doctor-unchecked", of("count", String.valueOf(unchecked)));
+         problems++;
+      }
+      if (config.dryRun()) {
+         send(sender, "doctor-dry-run");
+         problems++;
+      }
+      if (config.failClosed()) {
+         send(sender, "doctor-fail-closed");
+      }
+      if (!"never".equals(config.networkFastAdmitMode())) {
+         send(sender, "doctor-fast-admit", of("mode", config.networkFastAdmitMode()));
+      }
+      send(sender, problems == 0 ? "doctor-result-ok" : "doctor-result-problems",
+            of("count", String.valueOf(problems)));
+   }
+
+   private void doExplain(Sender sender, String[] args) {
+      if (args.length < 2) {
+         send(sender, "usage-explain");
+         return;
+      }
+      String target = args[1];
+      String ip = resolveIp(target);
+      if (ip == null) {
+         send(sender, "player-not-found", of("input", target));
+         return;
+      }
+      send(sender, "check-start", of("ip", ip));
+      core.platform().runAsync(() -> {
+         ShieldConfig config = core.config();
+         CheckEngine engine = adminEngine();
+         send(sender, "explain-header", of("target", target, "ip", ip));
+         send(sender, "explain-own-lists", of(
+               "whitelist", yesNo(core.whitelist().matches(ip)),
+               "blacklist", yesNo(core.blacklist().matches(ip))));
+         send(sender, "explain-address", of(
+               "local", yesNo(IpAddresses.isLocal(ip)),
+               "bogon", yesNo(IpAddresses.isBogon(ip))));
+         send(sender, "explain-lists", of("match", yesNo(config.useLists() && core.lists().matches(ip))));
+
+         var hit = engine.intelHit(ip);
+         if (hit == null) {
+            send(sender, core.intel().loaded() ? "explain-intel-none" : "explain-intel-missing");
+         } else {
+            send(sender, "explain-intel", of(
+                  "score", String.valueOf(hit.score()),
+                  "required", String.valueOf(config.intelBlockScore()),
+                  "reasons", hit.reasons().isEmpty() ? "-" : String.join(", ", hit.reasons()),
+                  "network", hit.network(),
+                  "country", hit.country() == null ? "?" : hit.country(),
+                  "asn", hit.asnName() == null ? "?" : hit.asnName()));
+         }
+         send(sender, "explain-cache", of("cached", yesNo(core.lookups().cached(ip).isPresent())));
+
+         CheckVerdict verdict = engine.check(target, null, ip, CheckEngine.PermissionProbe.NONE);
+         send(sender, verdict.blocked() ? "check-verdict-blocked" : "check-verdict-allowed",
+               of("reason", verdict.describe()));
+         LookupResult lookup = verdict.lookup();
+         if (lookup.resolved()) {
+            send(sender, "check-score", of(
+                  "score", String.format(Locale.ROOT, "%.1f", lookup.confidence()),
+                  "required", String.format(Locale.ROOT, "%.1f", config.requiredScore()),
+                  "signals", lookup.sourceSummary()));
+         } else if (lookup.failureReason() != null) {
+            send(sender, "check-unresolved", of("error", String.valueOf(lookup.failureReason())));
+         }
+         if (verdict.blocked() && config.dryRun()) {
+            send(sender, "check-dry-run-note");
+         }
+      });
+   }
+
+   private void doReport(Sender sender, String[] args) {
+      if (args.length < 3) {
+         send(sender, "usage-report");
+         return;
+      }
+      String kind = args[2].toLowerCase(Locale.ROOT);
+      if (!kind.equals("vpn") && !kind.equals("clean")) {
+         send(sender, "usage-report");
+         return;
+      }
+      String ip = resolveIp(args[1]);
+      if (ip == null) {
+         send(sender, "player-not-found", of("input", args[1]));
+         return;
+      }
+      if (IpAddresses.isLocal(ip) || IpAddresses.isBogon(ip)) {
+         send(sender, "report-local");
+         return;
+      }
+      core.platform().runAsync(() -> {
+         int status = core.reporter().feedback(ip, kind);
+         if (status == 200) {
+            send(sender, kind.equals("vpn") ? "report-sent-vpn" : "report-sent-clean");
+            if (kind.equals("clean")) {
+               send(sender, "report-whitelist-hint", of("ip", ip));
+            }
+         } else {
+            send(sender, "report-failed", of("status", String.valueOf(status)));
+         }
+      });
+   }
+
    private String resolveIp(String target) {
       if (IpAddresses.isValid(target)) {
          return target;
