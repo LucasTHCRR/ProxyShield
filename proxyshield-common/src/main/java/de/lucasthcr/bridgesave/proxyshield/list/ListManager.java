@@ -140,8 +140,9 @@ public final class ListManager {
 
       if (restored > 0) {
          ranges = builder.build();
-         platform.info("Restored " + ranges.rangeCount() + " ranges from " + restored
-               + " cached list(s) while waiting for a fresh download.");
+         // Schutz steht ab hier, der Download frischt nur auf
+         platform.info("VPN lists ready from cache: " + ranges.rangeCount() + " ranges from " + restored
+               + " cached list(s), a fresh download follows.");
       }
    }
 

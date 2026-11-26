@@ -109,4 +109,18 @@ class ConfigMigrationTest {
       assertTrue(upgraded.contains("\nreporting:\n"));
       assertTrue(platform.warnings().isEmpty(), platform.warnings().toString());
    }
+
+   @Test
+   @DisplayName("3.1.0 configs get the lower zowi weight, own values stay")
+   void lowersZowiWeight() throws IOException {
+      RecordingPlatform platform = new RecordingPlatform(tempDir);
+
+      String upgraded = migrate(resource("config-history/3.yml"), platform);
+      assertTrue(upgraded.matches("(?s).*\n    zowi:\n      enabled: true\n      weight: 1\\.0\n.*"), upgraded);
+
+      String own = resource("config-history/3.yml").replaceFirst("(    zowi:\n      enabled: true\n      weight: )1\\.5", "$12.0");
+      String kept = migrate(own, new RecordingPlatform(tempDir));
+      assertTrue(kept.contains("      weight: 2.0"), kept);
+   }
 }
+

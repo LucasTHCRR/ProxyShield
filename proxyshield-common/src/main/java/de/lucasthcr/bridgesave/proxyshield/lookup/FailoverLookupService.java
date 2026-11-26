@@ -72,6 +72,9 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
    private final ShieldConfig.LookupMode mode;
    private final double requiredScore;
    private final int firstWave;
+   private final boolean intelSettlesHome;
+   private final AtomicLong intelSettles = new AtomicLong();
+   private static final String INTEL_ID = "paperstream";
    private final long cleanSettleMillis;
    private final AtomicLong cleanSettles = new AtomicLong();
    private final AtomicLong stagedSkips = new AtomicLong();
@@ -120,6 +123,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       this.mode = config.lookupMode();
       this.requiredScore = config.requiredScore();
       this.firstWave = config.apiFirstWave();
+      this.intelSettlesHome = config.apiIntelSettlesHome();
       this.cleanSettleMillis = config.apiCleanSettleMillis();
       this.cleanTtlMillis = config.apiCacheMinutes() * 60_000L;
       this.flaggedTtlMillis = config.apiFlaggedCacheMinutes() * 60_000L;
@@ -251,7 +255,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
          }
          Round round = mode == ShieldConfig.LookupMode.FAILOVER
                ? new Round(failover(ip), true)
-               : consensus(ip, endUserNetwork ? cleanSettleMillis : 0);
+               : consensus(ip, endUserNetwork ? cleanSettleMillis : 0, endUserNetwork && intelSettlesHome);
          LookupResult result = round.result();
 
          lookups.incrementAndGet();
@@ -328,7 +332,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
     * Either way the round returns as soon as the threshold is reached and cancels what is still
     * running, so an obvious VPN costs the latency of the fastest provider that recognises it.
     */
-   private Round consensus(String ip, long softMillis) {
+   private Round consensus(String ip, long softMillis, boolean trustIntel) {
       ExecutorCompletionService<ProviderAnswer> completions =
             new ExecutorCompletionService<>(executor);
       List<Future<ProviderAnswer>> pending = new ArrayList<>(providers.size());
@@ -348,7 +352,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       long deadline = System.currentTimeMillis() + totalBudgetMillis;
       try {
          submit(completions, pending, ready.subList(0, firstSize), ip);
-         int state = collect(completions, firstSize, merge, deadline, softMillis);
+         int state = collect(completions, firstSize, merge, deadline, softMillis, trustIntel);
          if (state == COLLECT_DONE && firstSize < ready.size()) {
             if (merge.answered == firstSize && merge.proxyScore == 0.0 && merge.hostingScore == 0.0) {
                merge.settledEarly();
@@ -356,7 +360,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
             } else {
                int rest = ready.size() - firstSize;
                submit(completions, pending, ready.subList(firstSize, ready.size()), ip);
-               collect(completions, rest, merge, deadline, 0);
+               collect(completions, rest, merge, deadline, 0, trustIntel);
             }
          }
       } catch (InterruptedException interrupted) {
@@ -391,7 +395,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
     * cached only briefly.
     */
    private int collect(ExecutorCompletionService<ProviderAnswer> completions, int count,
-         Merge merge, long deadline, long softMillis) throws InterruptedException {
+         Merge merge, long deadline, long softMillis, boolean trustIntel) throws InterruptedException {
       long softAt = softMillis > 0 ? System.currentTimeMillis() + softMillis : 0;
       int taken = 0;
       while (taken < count) {
@@ -431,6 +435,12 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
          merge.add(answer);
          if (merge.proxyScore >= requiredScore) {
             merge.settledEarly();
+            return COLLECT_SETTLED;
+         }
+         // Heimnetz und PaperStream Intel sagt sauber: nicht auf den Rest warten
+         if (trustIntel && merge.intelClean && merge.proxyScore == 0.0 && merge.hostingScore == 0.0) {
+            merge.softSettled();
+            intelSettles.incrementAndGet();
             return COLLECT_SETTLED;
          }
       }
@@ -484,6 +494,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       private String asn;
       private String connectionType;
       private String lastFailure = "no provider answered";
+      private boolean intelClean;
 
       void add(ProviderAnswer answer) {
          LookupResult result = answer.result();
@@ -494,6 +505,9 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
 
          answered++;
          resolved = true;
+         if (INTEL_ID.equals(answer.id()) && !result.proxy() && !result.tor() && !result.hosting()) {
+            intelClean = true;
+         }
          double weight = answer.weight();
          if (result.proxy() || result.tor()) {
             proxyScore += weight;

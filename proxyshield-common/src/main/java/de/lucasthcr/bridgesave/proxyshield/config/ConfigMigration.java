@@ -63,6 +63,9 @@ public final class ConfigMigration {
       if (result.fromVersion() < 4 && switchOffFastAdmit(file)) {
          platform.info("detection.network-data.fast-admit is now \"never\", the new default. Set it to auto for the old behaviour.");
       }
+      if (result.fromVersion() < 4 && lowerZowiWeight(file)) {
+         platform.info("providers.zowi.weight is now 1.0, the new default. Zowi alone no longer reaches api.required-score.");
+      }
    }
 
 
@@ -89,6 +92,23 @@ public final class ConfigMigration {
       try {
          String text = Files.readString(file);
          String changed = FAST_ADMIT_AUTO.matcher(text).replaceFirst("$1never");
+         if (changed.equals(text)) {
+            return false;
+         }
+         Files.writeString(file, changed);
+         return true;
+      } catch (IOException | RuntimeException failed) {
+         return false;
+      }
+   }
+
+   // Nur der alte Standardwert 1.5 direkt unter zowi:, eigene Werte bleiben
+   private static final Pattern ZOWI_WEIGHT = Pattern.compile("(?m)^(\\s+zowi:\\s*\\n(?:\\s+(?!weight:)[\\w-]+:.*\\n)*?\\s+weight:\\s*)1\\.5[ \\t]*$");
+
+   static boolean lowerZowiWeight(Path file) {
+      try {
+         String text = Files.readString(file);
+         String changed = ZOWI_WEIGHT.matcher(text).replaceFirst("$11.0");
          if (changed.equals(text)) {
             return false;
          }

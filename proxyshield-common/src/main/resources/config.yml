@@ -385,6 +385,11 @@ api:
   # quota or recovering. 0 asks every provider at once.
   first-wave: 2
 
+  # For an address in a home or mobile network, a clean answer from PaperStream Intel settles the
+  # lookup and the other providers in the wave are not waited for. Intel already carries the public
+  # VPN, proxy and Tor lists, so this saves the player the slower second answer. false waits for all.
+  intel-settles-home: true
+
   # OFF by default. An address in a home or mobile network (known from the offline network feed) with
   # nothing against it can be let through after this many milliseconds on one clean answer, without
   # waiting for the slowest provider. In our benchmark this cut the login time of real players by about
