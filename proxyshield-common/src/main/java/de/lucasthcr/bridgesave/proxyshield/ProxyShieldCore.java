@@ -218,7 +218,10 @@ public final class ProxyShieldCore {
    private void initialRefresh() {
       // With a cached copy the server is already protected, so the download can wait for the
       // startup rush. On a first start nothing is, so it begins at once.
-      refreshIntel();
+      // Intel parallel, der Snapshot schuetzt schon, die Listen sollen nicht warten
+      Thread intelWorker = new Thread(this::refreshIntel, "ProxyShield-intel");
+      intelWorker.setDaemon(true);
+      intelWorker.start();
       // Kurz und zufaellig warten, damit nicht alle Server gleichzeitig laden
       long delayMillis = lists.ranges().isEmpty() ? 0L
             : java.util.concurrent.ThreadLocalRandom.current().nextLong(STARTUP_DELAY_MILLIS + 1);

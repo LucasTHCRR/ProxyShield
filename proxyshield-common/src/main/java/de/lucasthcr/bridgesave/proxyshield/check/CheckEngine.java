@@ -245,8 +245,10 @@ public final class CheckEngine {
                withSignals(result, score, signals));
       }
 
+      // Laut Netzdaten ein Heim- oder Mobilnetz: Hosting-Stimmen allein reichen dort nicht
+      boolean homeNetwork = network != null && network.endUser() && score < config.requiredScore();
       if (useProviderFlags && config.blockHosting() && result.hosting()
-            && !exemptHosting(result) && score >= config.hostingMinScore()) {
+            && !exemptHosting(result) && score >= config.hostingMinScore() && !homeNetwork) {
          return CheckVerdict.deny(CheckVerdict.Reason.HOSTING, detailFor(result, signals, score),
                withSignals(result, score, signals));
       }

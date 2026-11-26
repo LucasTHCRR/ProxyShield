@@ -449,7 +449,7 @@ api:
     # without a key, which is plenty with staged lookups. Run by Zowi (api.zowi.gay).
     zowi:
       enabled: true
-      weight: 1.5
+      weight: 1.0
       key: ""
 
     # Proxy, VPN, Tor, cloud and Spamhaus data. Free and unlimited. Also lists hosting and cloud
