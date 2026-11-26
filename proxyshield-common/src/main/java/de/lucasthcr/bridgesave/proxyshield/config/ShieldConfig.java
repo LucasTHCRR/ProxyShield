@@ -129,6 +129,7 @@ public final class ShieldConfig {
    private final LookupMode lookupMode;
    private final int apiFirstWave;
    private final boolean apiIntelSettlesHome;
+   private final int apiHomeTotalTimeoutMillis;
    private final int apiCleanSettleMillis;
    private final boolean appealEnabled;
    private final int appealCodeMinutes;
@@ -304,6 +305,7 @@ public final class ShieldConfig {
       this.lookupMode = LookupMode.parse(node.getString("api.mode", "consensus"));
       this.apiFirstWave = clamp(node.getInt("api.first-wave", 2), 0, 32);
       this.apiIntelSettlesHome = node.getBoolean("api.intel-settles-home", true);
+      this.apiHomeTotalTimeoutMillis = clamp((int) Math.round(node.getDouble("api.home-total-timeout-seconds", 1.0) * 1000), 200, 120_000);
       this.apiCleanSettleMillis = clamp(node.getInt("api.clean-settle-ms", 0), 0, 5000);
       this.appealEnabled = node.getBoolean("appeal.enabled", true);
       this.appealCodeMinutes = clamp(node.getInt("appeal.code-minutes", 180), 5, 10080);
@@ -928,6 +930,10 @@ public final class ShieldConfig {
 
    public boolean apiIntelSettlesHome() {
       return apiIntelSettlesHome;
+   }
+
+   public int apiHomeTotalTimeoutMillis() {
+      return apiHomeTotalTimeoutMillis;
    }
 
    /** Whether a refused player gets a code that staff can use with /proxyshield allow. */

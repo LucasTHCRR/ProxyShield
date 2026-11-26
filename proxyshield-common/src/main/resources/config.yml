@@ -390,6 +390,12 @@ api:
   # VPN, proxy and Tor lists, so this saves the player the slower second answer. false waits for all.
   intel-settles-home: true
 
+  # With intel-settles-home on, how long a login from a home or mobile network waits for the providers,
+  # in seconds. The local PaperStream Intel copy and the lists have already found nothing against the
+  # address by then, so when the services are slow or down, the player gets in after this instead of
+  # after total-timeout-seconds.
+  home-total-timeout-seconds: 1.0
+
   # OFF by default. An address in a home or mobile network (known from the offline network feed) with
   # nothing against it can be let through after this many milliseconds on one clean answer, without
   # waiting for the slowest provider. In our benchmark this cut the login time of real players by about

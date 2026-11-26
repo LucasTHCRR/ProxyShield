@@ -73,6 +73,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
    private final double requiredScore;
    private final int firstWave;
    private final boolean intelSettlesHome;
+   private final long homeBudgetMillis;
    private final AtomicLong intelSettles = new AtomicLong();
    private static final String INTEL_ID = "paperstream";
    private final long cleanSettleMillis;
@@ -124,6 +125,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       this.requiredScore = config.requiredScore();
       this.firstWave = config.apiFirstWave();
       this.intelSettlesHome = config.apiIntelSettlesHome();
+      this.homeBudgetMillis = config.apiHomeTotalTimeoutMillis();
       this.cleanSettleMillis = config.apiCleanSettleMillis();
       this.cleanTtlMillis = config.apiCacheMinutes() * 60_000L;
       this.flaggedTtlMillis = config.apiFlaggedCacheMinutes() * 60_000L;
@@ -349,7 +351,8 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       int firstSize = firstWave > 0 && firstWave < ready.size() ? firstWave : ready.size();
 
       Merge merge = new Merge();
-      long deadline = System.currentTimeMillis() + totalBudgetMillis;
+      // Heimnetz ohne lokalen Treffer: nicht das ganze Budget auf langsame Dienste warten
+      long deadline = System.currentTimeMillis() + (trustIntel ? Math.min(totalBudgetMillis, homeBudgetMillis) : totalBudgetMillis);
       try {
          submit(completions, pending, ready.subList(0, firstSize), ip);
          int state = collect(completions, firstSize, merge, deadline, softMillis, trustIntel);
