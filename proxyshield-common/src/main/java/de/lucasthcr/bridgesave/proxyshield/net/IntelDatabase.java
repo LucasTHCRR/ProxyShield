@@ -95,6 +95,17 @@ public final class IntelDatabase {
       return built == 0L || System.currentTimeMillis() / 1000L - built > maxAgeHours * 3600L;
    }
 
+   private void markChecked() {
+      lastRefreshMillis = System.currentTimeMillis();
+      if (stampFile != null && Files.isRegularFile(stampFile)) {
+         try {
+            Files.setLastModifiedTime(stampFile, java.nio.file.attribute.FileTime.fromMillis(lastRefreshMillis));
+         } catch (IOException ignored) {
+            // nur fuer den naechsten Start
+         }
+      }
+   }
+
    public long lastRefreshMillis() {
       return lastRefreshMillis;
    }
@@ -155,6 +166,10 @@ public final class IntelDatabase {
       }
       try {
          db = open(gunzip(Files.newInputStream(cacheFile)));
+         // Letzte Pruefung ueberlebt den Neustart, sonst laedt jeder Start neu
+         if (stampFile != null && Files.isRegularFile(stampFile)) {
+            lastRefreshMillis = Files.getLastModifiedTime(stampFile).toMillis();
+         }
          platform.info("Loaded the PaperStream Intel database from cache (" + db.nodes + " nodes).");
       } catch (IOException | RuntimeException failed) {
          platform.warn("Could not read the cached PaperStream Intel database: " + failed.getMessage());
@@ -225,7 +240,7 @@ public final class IntelDatabase {
          }
          int status = connection.getResponseCode();
          if (status == HttpURLConnection.HTTP_NOT_MODIFIED && loaded()) {
-            lastRefreshMillis = System.currentTimeMillis();
+            markChecked();
             return true;
          }
          if (status != HttpURLConnection.HTTP_OK) {
@@ -262,7 +277,7 @@ public final class IntelDatabase {
             Files.writeString(stampFile, modified);
          }
          db = fresh;
-         lastRefreshMillis = System.currentTimeMillis();
+         markChecked();
          platform.info("PaperStream Intel database ready (" + fresh.nodes + " nodes).");
          return true;
       } catch (IOException | RuntimeException failed) {

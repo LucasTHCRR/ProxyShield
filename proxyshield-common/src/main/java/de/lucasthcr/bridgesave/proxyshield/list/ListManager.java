@@ -124,6 +124,7 @@ public final class ListManager {
 
       IpRangeSet.Builder builder = IpRangeSet.builder();
       int restored = 0;
+      long oldest = Long.MAX_VALUE;
       for (String source : sources) {
          Path file = cacheFileFor(source);
          if (!Files.isRegularFile(file)) {
@@ -132,6 +133,7 @@ public final class ListManager {
          try {
             readInto(file, builder);
             restored++;
+            oldest = Math.min(oldest, Files.getLastModifiedTime(file).toMillis());
          } catch (IOException unreadable) {
             platform.warn("Could not read cached list " + file.getFileName() + ": "
                   + unreadable.getMessage());
@@ -140,6 +142,10 @@ public final class ListManager {
 
       if (restored > 0) {
          ranges = builder.build();
+         // Alle Quellen im Cache: der Stand zaehlt als letzter Download, der Takt entscheidet
+         if (restored == sources.size()) {
+            lastRefreshMillis = oldest;
+         }
          // Schutz steht ab hier, der Download frischt nur auf
          platform.info("VPN lists ready from cache: " + ranges.rangeCount() + " ranges from " + restored
                + " cached list(s), a fresh download follows.");

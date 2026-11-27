@@ -219,9 +219,19 @@ public final class ProxyShieldCore {
       // With a cached copy the server is already protected, so the download can wait for the
       // startup rush. On a first start nothing is, so it begins at once.
       // Intel parallel, der Snapshot schuetzt schon, die Listen sollen nicht warten
-      Thread intelWorker = new Thread(this::refreshIntel, "ProxyShield-intel");
-      intelWorker.setDaemon(true);
-      intelWorker.start();
+      ShieldConfig current = config;
+      if (current.intelEnabled() && intel.due(current.intelRefreshHours() * 3_600_000L)) {
+         Thread intelWorker = new Thread(this::refreshIntel, "ProxyShield-intel");
+         intelWorker.setDaemon(true);
+         intelWorker.start();
+      }
+      // Frischer Cache: nicht bei jedem Neustart alles neu laden, der Herzschlag holt es nach
+      long lastLists = lists.lastRefreshMillis();
+      if (lastLists > 0L && !lists.ranges().isEmpty()
+            && System.currentTimeMillis() - lastLists < current.listUpdateIntervalHours() * 3_600_000L) {
+         platform.info("VPN lists are fresh from cache, next download when they are due.");
+         return;
+      }
       // Kurz und zufaellig warten, damit nicht alle Server gleichzeitig laden
       long delayMillis = lists.ranges().isEmpty() ? 0L
             : java.util.concurrent.ThreadLocalRandom.current().nextLong(STARTUP_DELAY_MILLIS + 1);
