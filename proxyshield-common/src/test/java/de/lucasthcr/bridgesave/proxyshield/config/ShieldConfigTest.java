@@ -123,9 +123,9 @@ class ShieldConfigTest {
    }
 
    @Test
-   @DisplayName("Bedrock players are exempt by default")
-   void bedrockExemptionDefaultsOn() {
-      assertTrue(shipped.exemptBedrock());
+   @DisplayName("Bedrock players are checked by default")
+   void bedrockExemptionDefaultsOff() {
+      assertFalse(shipped.exemptBedrock());
    }
 
    @Test

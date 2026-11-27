@@ -442,17 +442,28 @@ class CheckEngineTest {
       private static final UUID JAVA = UUID.fromString("069a79f4-44e9-4726-a5be-fca90e38aaf5");
 
       @Test
-      @DisplayName("A Geyser player on a listed datacenter address is let through")
-      void bedrockIsExemptByDefault() throws IOException {
-         CheckEngine engine = engine(baseConfig(),
-               ip -> LookupResult.of(false, true, "DE", "Germany", "Hetzner"),
-               List.of("203.0.113.0/24"));
+      @DisplayName("A Bedrock player on a listed VPN address is blocked by default")
+      void bedrockIsCheckedByDefault() throws IOException {
+         CheckEngine engine = engine(baseConfig(), clean(), List.of("203.0.113.0/24"));
+
+         assertTrue(engine.check("Steve", BEDROCK, "203.0.113.7",
+               CheckEngine.PermissionProbe.NONE).blocked());
+      }
+
+      @Test
+      @DisplayName("A Bedrock player arriving from the Geyser server's own address is let through")
+      void geyserAddressIsExempt() throws IOException {
+         Map<String, Object> config = baseConfig();
+         config.put("whitelist.geyser-addresses", List.of("203.0.113.7"));
+         CheckEngine engine = engine(config, clean(), List.of("203.0.113.0/24"));
 
          CheckVerdict verdict = engine.check("Steve", BEDROCK, "203.0.113.7",
                CheckEngine.PermissionProbe.NONE);
 
          assertFalse(verdict.blocked());
          assertEquals(CheckVerdict.Reason.BEDROCK_PLAYER, verdict.reason());
+         assertTrue(engine.check("Steve", JAVA, "203.0.113.7",
+               CheckEngine.PermissionProbe.NONE).blocked(), "the Geyser address only covers Bedrock players");
       }
 
       @Test
@@ -466,13 +477,13 @@ class CheckEngineTest {
       }
 
       @Test
-      void exemptionCanBeTurnedOff() throws IOException {
+      void exemptionCanBeTurnedOn() throws IOException {
          Map<String, Object> config = baseConfig();
-         config.put("whitelist.bedrock-players", false);
+         config.put("whitelist.bedrock-players", true);
 
          CheckEngine engine = engine(config, clean(), List.of("203.0.113.0/24"));
 
-         assertTrue(engine.check("Steve", BEDROCK, "203.0.113.7",
+         assertFalse(engine.check("Steve", BEDROCK, "203.0.113.7",
                CheckEngine.PermissionProbe.NONE).blocked());
       }
 

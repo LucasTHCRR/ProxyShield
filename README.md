@@ -95,7 +95,7 @@ address.
 - Player name whitelist
 - Bypass permission
 - Loopback and private addresses are never checked, and never cost lookup quota
-- Bedrock players joining through Geyser/Floodgate are exempt by default
+- Bedrock players joining through Geyser/Floodgate are checked with their real address, which Floodgate passes on. If they only arrive with your Geyser server's address, list it in `whitelist.geyser-addresses`
 
 **Operations**
 
@@ -421,7 +421,7 @@ anything that can block one, so an operator can always whitelist their way out o
 | 1 | `proxyshield.bypass` permission | allow | none |
 | 2 | Name in `whitelist.players` | allow | none |
 | 3 | IP in `whitelist.ips` | allow | none |
-| 4 | Bedrock player via Floodgate | allow | none |
+| 4 | Bedrock player via Floodgate from `whitelist.geyser-addresses`, or with `whitelist.bedrock-players: true` | allow | none |
 | 5 | Loopback or private address | allow | none |
 | 6 | Bogon address | **block** | none |
 | 7 | IP in `blacklist.ips` | **block** | none |

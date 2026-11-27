@@ -197,15 +197,16 @@ whitelist:
   # Never blocked, by name (case insensitive).
   players: []
 
-  # Exempt Bedrock players who joined through Geyser/Floodgate.
-  #
-  # Keep this on unless you know you need it off. Whenever Geyser runs anywhere
-  # other than the player's own machine, the address seen here is Geyser's - and
-  # a Geyser instance on rented hardware sits in exactly the datacenter ranges
-  # the feeds list, so every Bedrock player would be dropped at once.
-  # Floodgate derives these UUIDs server side from the Xbox Live account, so a
-  # Java player cannot fake one to skip the check.
-  bedrock-players: true
+  # Bedrock players who joined through Geyser/Floodgate are checked like everyone
+  # else: Floodgate hands the server the real address of the Bedrock client, also
+  # when Geyser runs on its own machine. true lets every Bedrock player in unchecked.
+  bedrock-players: false
+
+  # Only needed if Bedrock players arrive with the address of your Geyser server
+  # instead of their own (Geyser without Floodgate data, an old setup). Bedrock players
+  # coming from these addresses or ranges are let in, everyone else is still checked.
+  # Local and private addresses are never checked anyway.
+  geyser-addresses: []
 
 blacklist:
   # Always blocked, checked before everything else including trust.

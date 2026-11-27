@@ -19,6 +19,7 @@
 package de.lucasthcr.bridgesave.proxyshield.check;
 
 import de.lucasthcr.bridgesave.proxyshield.config.ShieldConfig;
+import de.lucasthcr.bridgesave.proxyshield.net.IpRangeSet;
 import de.lucasthcr.bridgesave.proxyshield.list.ListManager;
 import de.lucasthcr.bridgesave.proxyshield.lookup.LookupProvider;
 import de.lucasthcr.bridgesave.proxyshield.lookup.LookupResult;
@@ -112,6 +113,19 @@ public final class CheckEngine {
       return this;
    }
 
+   private IpRangeSet geyserRanges;
+
+   private IpRangeSet geyserAddresses() {
+      if (geyserRanges == null) {
+         IpRangeSet.Builder builder = IpRangeSet.builder();
+         for (String entry : config.geyserAddresses()) {
+            builder.add(entry);
+         }
+         geyserRanges = builder.build();
+      }
+      return geyserRanges;
+   }
+
    /**
     * Runs the full pipeline. Performs a blocking HTTP lookup when needed, so this must be called
     * off the main thread.
@@ -123,7 +137,9 @@ public final class CheckEngine {
          return CheckVerdict.allow(CheckVerdict.Reason.BYPASS_PERMISSION);
       }
 
-      if (config.exemptBedrock() && BedrockPlayers.isBedrock(uuid)) {
+      // Floodgate setzt die echte Client-Adresse ein, also normal pruefen ausser bei Geysers eigener
+      if (BedrockPlayers.isBedrock(uuid) && (config.exemptBedrock()
+            || (ip != null && IpAddresses.isValid(ip) && geyserAddresses().contains(ip)))) {
          return CheckVerdict.allow(CheckVerdict.Reason.BEDROCK_PLAYER);
       }
 

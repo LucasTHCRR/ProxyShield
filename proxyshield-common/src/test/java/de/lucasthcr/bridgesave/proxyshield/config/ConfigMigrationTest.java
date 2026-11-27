@@ -117,6 +117,7 @@ class ConfigMigrationTest {
 
       String upgraded = migrate(resource("config-history/3.yml"), platform);
       assertTrue(upgraded.matches("(?s).*\n    zowi:\n      enabled: true\n      weight: 1\\.0\n.*"), upgraded);
+      assertTrue(upgraded.contains("\n  bedrock-players: false"), "3.1.0 exempted Bedrock players, 3.2.0 checks them");
 
       String own = resource("config-history/3.yml").replaceFirst("(    zowi:\n      enabled: true\n      weight: )1\\.5", "$12.0");
       String kept = migrate(own, new RecordingPlatform(tempDir));

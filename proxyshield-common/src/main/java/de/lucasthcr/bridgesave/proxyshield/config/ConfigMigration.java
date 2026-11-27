@@ -63,6 +63,9 @@ public final class ConfigMigration {
       if (result.fromVersion() < 4 && switchOffFastAdmit(file)) {
          platform.info("detection.network-data.fast-admit is now \"never\", the new default. Set it to auto for the old behaviour.");
       }
+      if (result.fromVersion() < 4 && checkBedrockPlayers(file)) {
+         platform.info("whitelist.bedrock-players is now false: Bedrock players are checked with the real address Floodgate passes on. Add your Geyser server to whitelist.geyser-addresses if they arrive with its address.");
+      }
       if (result.fromVersion() < 4 && lowerZowiWeight(file)) {
          platform.info("providers.zowi.weight is now 1.0, the new default. Zowi alone no longer reaches api.required-score.");
       }
@@ -109,6 +112,22 @@ public final class ConfigMigration {
       try {
          String text = Files.readString(file);
          String changed = ZOWI_WEIGHT.matcher(text).replaceFirst("$11.0");
+         if (changed.equals(text)) {
+            return false;
+         }
+         Files.writeString(file, changed);
+         return true;
+      } catch (IOException | RuntimeException failed) {
+         return false;
+      }
+   }
+
+   private static final Pattern BEDROCK_EXEMPT = Pattern.compile("(?m)^(  bedrock-players:\\s*)true[ \\t]*$");
+
+   static boolean checkBedrockPlayers(Path file) {
+      try {
+         String text = Files.readString(file);
+         String changed = BEDROCK_EXEMPT.matcher(text).replaceFirst("$1false");
          if (changed.equals(text)) {
             return false;
          }

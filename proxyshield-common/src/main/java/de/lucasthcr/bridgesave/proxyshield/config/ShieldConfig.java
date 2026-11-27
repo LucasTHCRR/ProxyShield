@@ -113,6 +113,7 @@ public final class ShieldConfig {
 
    // whitelist / blacklist
    private final List<String> whitelistIps;
+   private final List<String> geyserAddresses;
    private final Set<String> whitelistPlayers;
    private final List<String> blacklistIps;
 
@@ -277,7 +278,8 @@ public final class ShieldConfig {
       this.useLists = node.getBoolean("detection.use-lists", true);
       this.useApi = node.getBoolean("detection.use-api", true);
       this.recheckOnline = node.getBoolean("detection.recheck-online-on-reload", false);
-      this.exemptBedrock = node.getBoolean("whitelist.bedrock-players", true);
+      this.exemptBedrock = node.getBoolean("whitelist.bedrock-players", false);
+      this.geyserAddresses = List.copyOf(node.getStringList("whitelist.geyser-addresses"));
 
       this.countryEnabled = node.getBoolean("country.enabled", false);
       this.countryMode = CountryMode.parse(node.getString("country.mode", "blacklist"));
@@ -853,6 +855,10 @@ public final class ShieldConfig {
 
    public boolean blockUnknownCountry() {
       return blockUnknownCountry;
+   }
+
+   public List<String> geyserAddresses() {
+      return geyserAddresses;
    }
 
    public List<String> whitelistIps() {
