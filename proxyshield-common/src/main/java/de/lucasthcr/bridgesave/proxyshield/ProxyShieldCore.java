@@ -204,8 +204,12 @@ public final class ProxyShieldCore {
    }
 
    private ReverseDns newReverseDns(ShieldConfig current) {
-      return new ReverseDns(current.rdnsTimeoutMillis(), current.apiMaxCacheEntries(),
+      ReverseDns created = new ReverseDns(current.rdnsTimeoutMillis(), current.apiMaxCacheEntries(),
             current.apiCacheMinutes() * 60_000L);
+      if (current.rdnsEnabled()) {
+         created.probe();
+      }
+      return created;
    }
 
    /**

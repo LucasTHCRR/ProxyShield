@@ -177,6 +177,9 @@ public final class CheckEngine {
          return CheckVerdict.allow(CheckVerdict.Reason.TRUSTED_PLAYER);
       }
 
+      if (config.rdnsEnabled() && reverseDns != null) {
+         reverseDns.prefetch(ip);
+      }
       IntelDatabase.Hit hit = intelHit(ip);
       NetworkData.Network network = networks != null && networks.loaded() ? networks.classify(ip) : null;
       if (network == null && hit != null && !"unknown".equals(hit.network())) {
@@ -252,8 +255,14 @@ public final class CheckEngine {
          return ispVerdict;
       }
 
-      score += reverseDnsWeight(ip, signals);
       score += heuristicWeight(uuid, ip, result.countryCode(), signals);
+      // rDNS nur abwarten, wenn es das Urteil noch kippen kann
+      boolean decided = (useProviderFlags && (result.proxy() || result.tor()))
+            || score >= config.requiredScore()
+            || score + config.rdnsWeight() < config.requiredScore();
+      if (!decided) {
+         score += reverseDnsWeight(ip, signals);
+      }
 
       if (useProviderFlags && config.blockTor() && result.tor()) {
          return CheckVerdict.deny(CheckVerdict.Reason.TOR, joined(signals), result);
@@ -336,7 +345,7 @@ public final class CheckEngine {
       if (!config.rdnsEnabled() || reverseDns == null) {
          return 0.0;
       }
-      Optional<String> matched = reverseDns.match(ip, config.rdnsPatterns());
+      Optional<String> matched = reverseDns.match(ip, config.rdnsPatterns(), 150);
       if (matched.isEmpty()) {
          return 0.0;
       }

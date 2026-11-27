@@ -98,6 +98,11 @@ public final class ReverseDns {
 
    /** The PTR name for an address, or empty when there is none or the lookup ran out of time. */
    public Optional<String> hostname(String ip) {
+      return hostname(ip, Long.MAX_VALUE);
+   }
+
+   // graceMillis: hoechstens so lange noch warten, auch wenn das Budget mehr erlaubt
+   public Optional<String> hostname(String ip, long graceMillis) {
       byte[] raw = IpAddresses.parseLiteral(ip);
       if (raw == null) {
          return Optional.empty();
@@ -108,24 +113,78 @@ public final class ReverseDns {
       if (cached.isPresent()) {
          return cached.get().isEmpty() ? Optional.empty() : cached;
       }
+      if (System.currentTimeMillis() < resolverDownUntil) {
+         return Optional.empty();
+      }
 
-      Future<String> pending = resolver.submit(() -> resolvePtr(raw));
+      Started started = inFlight.computeIfAbsent(key,
+            k -> new Started(resolver.submit(() -> resolvePtr(raw)), System.currentTimeMillis()));
+      long wait = Math.max(1, Math.min(graceMillis, timeoutMillis - (System.currentTimeMillis() - started.at())));
 
       try {
-         String name = pending.get(timeoutMillis, TimeUnit.MILLISECONDS);
+         String name = started.future().get(wait, TimeUnit.MILLISECONDS);
          cache.put(key, name);
+         timeoutsInARow.set(0);
          return name.isEmpty() ? Optional.empty() : Optional.of(name);
       } catch (InterruptedException interrupted) {
          Thread.currentThread().interrupt();
-         pending.cancel(true);
+         started.future().cancel(true);
          return Optional.empty();
       } catch (Exception timedOutOrFailed) {
-         pending.cancel(true);
+         started.future().cancel(true);
          // Remember the miss briefly so a dead resolver does not cost the budget on every login.
          cache.put(key, "");
+         // Drei Timeouts am Stueck: Resolver gilt fuer 5 Minuten als tot
+         if (System.currentTimeMillis() - started.at() >= timeoutMillis
+               && timeoutsInARow.incrementAndGet() >= 3) {
+            resolverDownUntil = System.currentTimeMillis() + 300_000L;
+            timeoutsInARow.set(0);
+         }
          return Optional.empty();
+      } finally {
+         inFlight.remove(key, started);
       }
    }
+
+   // Beim Start einmal pruefen, ob DNS antwortet, sonst warten die ersten Joins umsonst
+   public void probe() {
+      byte[] probe = {1, 1, 1, 1};
+      Thread thread = new Thread(() -> {
+         Future<String> pending = resolver.submit(() -> resolvePtr(probe));
+         try {
+            pending.get(timeoutMillis, TimeUnit.MILLISECONDS);
+         } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+         } catch (Exception deadResolver) {
+            pending.cancel(true);
+            resolverDownUntil = System.currentTimeMillis() + 300_000L;
+         }
+      }, "ProxyShield-rdns-probe");
+      thread.setDaemon(true);
+      thread.start();
+   }
+
+   /** Starts the lookup early, so it runs while the providers are asked. */
+   public void prefetch(String ip) {
+      byte[] raw = IpAddresses.parseLiteral(ip);
+      if (raw == null || System.currentTimeMillis() < resolverDownUntil) {
+         return;
+      }
+      String key = IpAddresses.cacheKey(ip);
+      if (cache.get(key).isPresent()) {
+         return;
+      }
+      inFlight.computeIfAbsent(key,
+            k -> new Started(resolver.submit(() -> resolvePtr(raw)), System.currentTimeMillis()));
+   }
+
+   private record Started(Future<String> future, long at) {
+   }
+
+   private final java.util.concurrent.ConcurrentHashMap<String, Started> inFlight =
+         new java.util.concurrent.ConcurrentHashMap<>();
+   private final AtomicInteger timeoutsInARow = new AtomicInteger();
+   private volatile long resolverDownUntil;
 
    /**
     * Asks for the PTR record itself instead of going through {@link
@@ -215,7 +274,11 @@ public final class ReverseDns {
     * @param patterns substrings to look for, or empty to use the built-in list
     */
    public Optional<String> match(String ip, List<String> patterns) {
-      Optional<String> hostname = hostname(ip);
+      return match(ip, patterns, Long.MAX_VALUE);
+   }
+
+   public Optional<String> match(String ip, List<String> patterns, long graceMillis) {
+      Optional<String> hostname = hostname(ip, graceMillis);
       if (hostname.isEmpty()) {
          return Optional.empty();
       }
