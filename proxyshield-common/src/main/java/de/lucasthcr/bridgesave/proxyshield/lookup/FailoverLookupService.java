@@ -353,7 +353,29 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       Merge merge = new Merge();
       // Heimnetz ohne lokalen Treffer: nicht das ganze Budget auf langsame Dienste warten
       long deadline = System.currentTimeMillis() + (trustIntel ? Math.min(totalBudgetMillis, homeBudgetMillis) : totalBudgetMillis);
+      IpLookupService intel = null;
+      if (trustIntel) {
+         for (IpLookupService provider : ready) {
+            if (INTEL_ID.equals(provider.id())) {
+               intel = provider;
+            }
+         }
+      }
       try {
+         if (intel != null && ready.size() > 1) {
+            // Heimnetz: erst nur Intel fragen, die anderen erst bei Treffer, Fehler oder langsamer Antwort
+            submit(completions, pending, List.of(intel), ip);
+            long hedgeAt = Math.min(deadline, System.currentTimeMillis() + INTEL_HEDGE_MILLIS);
+            int state = collect(completions, 1, merge, hedgeAt, 0, true);
+            if (state != COLLECT_SETTLED) {
+               List<IpLookupService> others = new ArrayList<>(ready);
+               others.remove(intel);
+               submit(completions, pending, others, ip);
+               int open = others.size() + (state == COLLECT_BUDGET ? 1 : 0);
+               collect(completions, open, merge, deadline, 0, true);
+            }
+            return new Round(merge.toResult(requiredScore), merge.complete(pending.size()));
+         }
          submit(completions, pending, ready.subList(0, firstSize), ip);
          int state = collect(completions, firstSize, merge, deadline, softMillis, trustIntel);
          if (state == COLLECT_DONE && firstSize < ready.size()) {
@@ -377,6 +399,7 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       return new Round(merge.toResult(requiredScore), merge.complete(pending.size()));
    }
 
+   private static final long INTEL_HEDGE_MILLIS = 450L;
    private static final int COLLECT_DONE = 0;
    private static final int COLLECT_SETTLED = 1;
    private static final int COLLECT_BUDGET = 2;
