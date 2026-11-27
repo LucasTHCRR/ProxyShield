@@ -19,8 +19,8 @@
 package de.lucasthcr.bridgesave.proxyshield.check;
 
 import de.lucasthcr.bridgesave.proxyshield.config.ShieldConfig;
-import de.lucasthcr.bridgesave.proxyshield.net.IpRangeSet;
 import de.lucasthcr.bridgesave.proxyshield.list.ListManager;
+import de.lucasthcr.bridgesave.proxyshield.net.IpRangeSet;
 import de.lucasthcr.bridgesave.proxyshield.lookup.LookupProvider;
 import de.lucasthcr.bridgesave.proxyshield.lookup.LookupResult;
 import de.lucasthcr.bridgesave.proxyshield.net.IpAddresses;
@@ -177,22 +177,29 @@ public final class CheckEngine {
          return CheckVerdict.allow(CheckVerdict.Reason.TRUSTED_PLAYER);
       }
 
-      if (config.useLists() && lists.matches(ip)) {
-         return CheckVerdict.deny(CheckVerdict.Reason.IP_LIST, null, LookupResult.UNKNOWN);
+      IntelDatabase.Hit hit = intelHit(ip);
+      NetworkData.Network network = networks != null && networks.loaded() ? networks.classify(ip) : null;
+      if (network == null && hit != null && !"unknown".equals(hit.network())) {
+         network = new NetworkData.Network(hit.endUser(), "hosting".equals(hit.network()),
+               "no_users".equals(hit.network()), hit.country(), hit.asn());
       }
 
-      IntelDatabase.Hit hit = intelHit(ip);
+      // Listen enthalten auch Rechenzentrums-Bereiche, die in Heimnetze hineinreichen.
+      // In einem Heimnetz ohne VPN-, Proxy- oder Tor-Treffer bei Intel entscheiden die Dienste.
+      if (config.useLists() && lists.matches(ip)) {
+         boolean homeWithoutIntelFlag = network != null && network.endUser()
+               && hit != null && !hit.vpn() && !hit.proxy() && !hit.tor();
+         if (!homeWithoutIntelFlag) {
+            return CheckVerdict.deny(CheckVerdict.Reason.IP_LIST, null, LookupResult.UNKNOWN);
+         }
+      }
+
       CheckVerdict intelVerdict = intelVerdict(hit);
       if (intelVerdict != null) {
          return intelVerdict;
       }
 
       boolean needsLookup = config.useApi() || config.countryEnabled();
-      NetworkData.Network network = networks != null && networks.loaded() ? networks.classify(ip) : null;
-      if (network == null && hit != null && !"unknown".equals(hit.network())) {
-         network = new NetworkData.Network(hit.endUser(), "hosting".equals(hit.network()),
-               "no_users".equals(hit.network()), hit.country(), hit.asn());
-      }
       LookupResult result;
       boolean surge = burst.record();
       boolean fast = switch (config.networkFastAdmitMode()) {
