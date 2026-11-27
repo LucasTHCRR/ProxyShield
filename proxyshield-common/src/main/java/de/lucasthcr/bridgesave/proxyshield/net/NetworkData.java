@@ -138,12 +138,18 @@ public final class NetworkData {
 
    /** Reads the copy on disk, if there is one. */
    public void loadFromDisk() {
+      loadFromDisk(true);
+   }
+
+   public void loadFromDisk(boolean announce) {
       if (!Files.isRegularFile(cacheFile)) {
          return;
       }
       try (InputStream in = Files.newInputStream(cacheFile)) {
          parse(in);
-         platform.info("Loaded " + rangeCount() + " network ranges from the cached feed.");
+         if (announce) {
+            platform.info("Loaded " + rangeCount() + " network ranges from the cached feed.");
+         }
       } catch (IOException | RuntimeException failed) {
          platform.warn("Could not read the cached network feed: " + failed.getMessage());
       }
@@ -199,6 +205,7 @@ public final class NetworkData {
    private void parse(InputStream raw) throws IOException {
       List<Object[]> four = new ArrayList<>();
       List<Object[]> six = new ArrayList<>();
+      java.util.Map<String, String> countries = new java.util.HashMap<>();
       long bytes = 0;
       try (BufferedReader reader = new BufferedReader(
             new InputStreamReader(new GZIPInputStream(raw), StandardCharsets.UTF_8))) {
@@ -211,16 +218,21 @@ public final class NetworkData {
             if (line.isEmpty() || line.charAt(0) == '#') {
                continue;
             }
-            String[] parts = line.split("\t");
-            if (parts.length < 6) {
+            // Ohne split und Regex, das spart beim Start viel Zeit
+            int t0 = line.indexOf('\t');
+            int t1 = t0 < 0 ? -1 : line.indexOf('\t', t0 + 1);
+            int t2 = t1 < 0 ? -1 : line.indexOf('\t', t1 + 1);
+            int t3 = t2 < 0 ? -1 : line.indexOf('\t', t2 + 1);
+            int t4 = t3 < 0 ? -1 : line.indexOf('\t', t3 + 1);
+            if (t4 < 0 || t2 == t1 + 1) {
                continue;
             }
-            if (parts[2].isEmpty()) {
-               continue;
-            }
-            Object[] row = {new BigInteger(parts[0]), new BigInteger(parts[1]), parts[2].charAt(0),
-                  parts[3], Long.parseLong(parts[4])};
-            ("6".equals(parts[5]) ? six : four).add(row);
+            int t5 = line.indexOf('\t', t4 + 1);
+            String family = line.substring(t4 + 1, t5 < 0 ? line.length() : t5);
+            String countryCode = countries.computeIfAbsent(line.substring(t2 + 1, t3), k -> k);
+            Object[] row = {number(line, 0, t0), number(line, t0 + 1, t1), line.charAt(t1 + 1),
+                  countryCode, Long.parseLong(line, t3 + 1, t4, 10)};
+            ("6".equals(family) ? six : four).add(row);
          }
       }
       Table fresh4 = sorted(four);
@@ -229,8 +241,19 @@ public final class NetworkData {
       v6 = fresh6;
    }
 
+   private static BigInteger number(String line, int from, int to) {
+      if (to - from <= 18) {
+         return BigInteger.valueOf(Long.parseLong(line, from, to, 10));
+      }
+      return new BigInteger(line.substring(from, to));
+   }
+
    private static Table sorted(List<Object[]> rows) {
-      rows.sort((a, b) -> ((BigInteger) a[0]).compareTo((BigInteger) b[0]));
+      boolean ordered = true;
+      for (int i = 1; i < rows.size() && ordered; i++) {
+         ordered = ((BigInteger) rows.get(i - 1)[0]).compareTo((BigInteger) rows.get(i)[0]) <= 0;
+      }
+      if (!ordered) rows.sort((a, b) -> ((BigInteger) a[0]).compareTo((BigInteger) b[0]));
       return new Table(rows);
    }
 }

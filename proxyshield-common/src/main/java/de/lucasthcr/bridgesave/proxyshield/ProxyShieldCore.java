@@ -139,8 +139,8 @@ public final class ProxyShieldCore {
       trust.load();
       alts.load();
       asnFeed.loadFromDisk();
-      networks.loadFromDisk();
-      intel.loadFromDisk();
+      // Netz-Feed im Hintergrund, bis dahin liefert die Intel-Kopie die Netzart
+      platform.runAsync(() -> networks.loadFromDisk(false));
 
       if (storage.shared()) {
          platform.info("Verdicts and trust are shared through " + storage.name()
@@ -171,7 +171,7 @@ public final class ProxyShieldCore {
       ProxyShieldApi.bind(this);
       platform.info("ProxyShield " + platform.version() + " enabled on " + platform.name() + " in "
             + (System.nanoTime() - startedNanos) / 1_000_000L + " ms (protection from cache: "
-            + lists.ranges().rangeCount() + " list ranges, PaperStream Intel " + (intel.loaded() ? "loaded" : "not yet") + ").");
+            + lists.ranges().rangeCount() + " list ranges, PaperStream Intel loading in the background).");
    }
 
    public void shutdown() {
@@ -224,11 +224,15 @@ public final class ProxyShieldCore {
       // startup rush. On a first start nothing is, so it begins at once.
       // Intel parallel, der Snapshot schuetzt schon, die Listen sollen nicht warten
       ShieldConfig current = config;
-      if (current.intelEnabled() && intel.due(current.intelRefreshHours() * 3_600_000L)) {
-         Thread intelWorker = new Thread(this::refreshIntel, "ProxyShield-intel");
-         intelWorker.setDaemon(true);
-         intelWorker.start();
-      }
+      // Intel-Kopie leise im Hintergrund laden, danach erst pruefen ob sie faellig ist
+      Thread intelWorker = new Thread(() -> {
+         intel.loadFromDisk(false);
+         if (current.intelEnabled() && intel.due(current.intelRefreshHours() * 3_600_000L)) {
+            refreshIntel();
+         }
+      }, "ProxyShield-intel");
+      intelWorker.setDaemon(true);
+      intelWorker.start();
       // Frischer Cache: nicht bei jedem Neustart alles neu laden, der Herzschlag holt es nach
       long lastLists = lists.lastRefreshMillis();
       if (lastLists > 0L && !lists.ranges().isEmpty()

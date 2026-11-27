@@ -157,6 +157,10 @@ public final class IntelDatabase {
    }
 
    public void loadFromDisk() {
+      loadFromDisk(true);
+   }
+
+   public void loadFromDisk(boolean announce) {
       if (cacheFile == null) {
          return;
       }
@@ -170,7 +174,9 @@ public final class IntelDatabase {
          if (stampFile != null && Files.isRegularFile(stampFile)) {
             lastRefreshMillis = Files.getLastModifiedTime(stampFile).toMillis();
          }
-         platform.info("Loaded the PaperStream Intel database from cache (" + db.nodes + " nodes).");
+         if (announce) {
+            platform.info("Loaded the PaperStream Intel database from cache (" + db.nodes + " nodes).");
+         }
       } catch (IOException | RuntimeException failed) {
          platform.warn("Could not read the cached PaperStream Intel database: " + failed.getMessage());
       }
