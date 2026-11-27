@@ -210,7 +210,9 @@ public final class CheckEngine {
          case "auto" -> surge;
          default -> false;
       };
-      if (needsLookup && network != null && network.endUser() && fast) {
+      // Intel-Kontingent leer: Heimnetz ohne lokalen Treffer nicht an langsame Ersatzdienste haengen
+      boolean intelShort = hit != null && lookups.intelExhausted();
+      if (needsLookup && network != null && network.endUser() && (fast || intelShort)) {
          // An end-user network with nothing against it: save the providers' quota for addresses
          // that need it. The feed still supplies country and network number for the later rules.
          result = LookupResult.of(false, false, false, network.country(), null, null,

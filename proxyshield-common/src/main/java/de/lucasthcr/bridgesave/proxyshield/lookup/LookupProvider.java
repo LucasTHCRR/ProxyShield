@@ -44,4 +44,9 @@ public interface LookupProvider {
    default LookupResult lookup(String ip, boolean endUserNetwork) {
       return lookup(ip);
    }
+
+   /** Ob das PaperStream-Intel-Kontingent gerade leer ist oder Intel pausiert. */
+   default boolean intelExhausted() {
+      return false;
+   }
 }

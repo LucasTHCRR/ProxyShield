@@ -399,6 +399,16 @@ public final class FailoverLookupService implements LookupProvider, AutoCloseabl
       return new Round(merge.toResult(requiredScore), merge.complete(pending.size()));
    }
 
+   @Override
+   public boolean intelExhausted() {
+      for (IpLookupService provider : providers) {
+         if (INTEL_ID.equals(provider.id())) {
+            return !provider.ready();
+         }
+      }
+      return false;
+   }
+
    private static final long INTEL_HEDGE_MILLIS = 450L;
    private static final int COLLECT_DONE = 0;
    private static final int COLLECT_SETTLED = 1;
