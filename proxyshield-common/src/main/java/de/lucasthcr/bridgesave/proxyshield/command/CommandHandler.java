@@ -461,7 +461,7 @@ public final class CommandHandler {
          if (lookup.resolved()) {
             send(sender, "check-country", of(
                   "code", lookup.countryOrUnknown(),
-                  "name", lookup.countryName() == null ? "?" : lookup.countryName()));
+                  "name", countryName(lookup)));
             send(sender, "check-isp", of("isp", lookup.ispOrUnknown()));
             send(sender, "check-flags", of(
                   "proxy", yesNo(lookup.proxy()),
@@ -1059,5 +1059,16 @@ public final class CommandHandler {
 
    private String onOff(boolean value) {
       return messages().get(value ? "word-on" : "word-off");
+   }
+
+   // Ohne Namen vom Dienst den Laendernamen aus dem Code bilden
+   private static String countryName(LookupResult lookup) {
+      if (lookup.countryName() != null) {
+         return lookup.countryName();
+      }
+      String code = lookup.countryOrUnknown();
+      String name = code.length() == 2
+            ? new Locale("", code).getDisplayCountry(Locale.ENGLISH) : "";
+      return name.isEmpty() || name.equals(code) ? "?" : name;
    }
 }

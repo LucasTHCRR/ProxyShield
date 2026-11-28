@@ -212,6 +212,7 @@ public final class ProviderCatalog {
             .tor("tor")
             .country("country")
             .asn("asn")
+            .isp("as_name")
             .weight(1.0)
             .rateLimit(1000)
             .build());
