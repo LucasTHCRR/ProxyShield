@@ -267,6 +267,10 @@ public final class Messages {
       m.put("help-report", "&e/proxyshield report <player|ip> <vpn|clean> &8- &7Tell PaperStream Intel about a missed VPN or a wrong block");
       m.put("usage-explain", "{prefix}&cUsage: &f/proxyshield explain <player|ip>");
       m.put("usage-report", "{prefix}&cUsage: &f/proxyshield report <player|ip> <vpn|clean>");
+      m.put("help-ping", "&e/proxyshield ping &8- &7Ask every lookup provider once and show its response time");
+      m.put("ping-header", "&8&m----&r &bProvider ping &8&m----");
+      m.put("ping-ok", "&7» &f{provider} &8({host})&7: &a{ms} ms");
+      m.put("ping-failed", "&7» &f{provider} &8({host})&7: &cfailed &8({reason})");
       m.put("doctor-header", "&8&m----&r &bProxyShield doctor &8&m----");
       m.put("doctor-intel-off", "&e! &7PaperStream Intel database is switched off (detection.intel.enabled).");
       m.put("doctor-intel-missing", "&c✖ &7PaperStream Intel database is not loaded yet. Run &f/proxyshield refresh&7.");

@@ -55,7 +55,7 @@ public final class CommandHandler {
 
    private static final List<String> SUBCOMMANDS = List.of(
          "help", "info", "providers", "reload", "stats", "check", "lookup", "refresh", "recheck",
-         "whitelist", "blacklist", "alts", "clearcache", "dryrun", "silent", "reporting", "update", "fpreport", "allow", "doctor", "explain", "report");
+         "whitelist", "blacklist", "alts", "clearcache", "dryrun", "silent", "reporting", "update", "fpreport", "allow", "doctor", "ping", "explain", "report");
 
    private static final List<String> LIST_ACTIONS =
          List.of("add", "remove", "list", "info", "purge");
@@ -126,6 +126,7 @@ public final class CommandHandler {
          case "fpreport" -> doFalsePositiveReport(sender, args);
          case "allow" -> doAllow(sender, args);
          case "doctor" -> doDoctor(sender);
+         case "ping" -> doPing(sender);
          case "explain" -> doExplain(sender, args);
          case "report" -> doReport(sender, args);
          case "lookup" -> doLookup(sender, args);
@@ -202,7 +203,7 @@ public final class CommandHandler {
       send(sender, "help-header", of("version", core.platform().version()));
       for (String key : List.of("help-info", "help-stats", "help-check", "help-lookup",
             "help-whitelist", "help-blacklist", "help-alts", "help-refresh", "help-recheck",
-            "help-clearcache", "help-reporting", "help-update", "help-fpreport", "help-allow", "help-doctor", "help-explain", "help-report", "help-reload", "help-footer")) {
+            "help-clearcache", "help-reporting", "help-update", "help-fpreport", "help-allow", "help-doctor", "help-ping", "help-explain", "help-report", "help-reload", "help-footer")) {
          send(sender, key);
       }
    }
@@ -874,6 +875,25 @@ public final class CommandHandler {
          return "?";
       }
       return String.format(Locale.ROOT, "%.1f", (System.currentTimeMillis() - epochMillis) / 3_600_000.0);
+   }
+
+   // Jeden Anbieter einmal mit derselben Adresse fragen und die Zeit messen
+   private void doPing(Sender sender) {
+      send(sender, "ping-header");
+      core.platform().runAsync(() -> {
+         for (var provider : core.lookups().providers()) {
+            long started = System.nanoTime();
+            LookupResult result = provider.lookup("1.1.1.1");
+            long millis = (System.nanoTime() - started) / 1_000_000L;
+            if (result.resolved()) {
+               send(sender, "ping-ok", of("provider", provider.id(), "host", provider.host(),
+                     "ms", String.valueOf(millis)));
+            } else {
+               send(sender, "ping-failed", of("provider", provider.id(), "host", provider.host(),
+                     "reason", String.valueOf(result.failureReason())));
+            }
+         }
+      });
    }
 
    private void doDoctor(Sender sender) {
