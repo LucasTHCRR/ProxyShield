@@ -1061,14 +1061,14 @@ public final class CommandHandler {
       return messages().get(value ? "word-on" : "word-off");
    }
 
-   // Ohne Namen vom Dienst den Laendernamen aus dem Code bilden
+   // Name immer aus dem Code, sonst passen Code und Name von verschiedenen Diensten nicht zusammen
    private static String countryName(LookupResult lookup) {
-      if (lookup.countryName() != null) {
-         return lookup.countryName();
-      }
       String code = lookup.countryOrUnknown();
       String name = code.length() == 2
             ? new Locale("", code).getDisplayCountry(Locale.ENGLISH) : "";
-      return name.isEmpty() || name.equals(code) ? "?" : name;
+      if (name.isEmpty() || name.equals(code)) {
+         return lookup.countryName() == null ? "?" : lookup.countryName();
+      }
+      return name;
    }
 }
