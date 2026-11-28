@@ -34,6 +34,10 @@ detection:
   # before you switch enforcement on.
   dry-run: false
 
+  # Learning phase after the first start: for this many hours nobody is kicked, everything is
+  # only logged. When it ends, the console says how many joins would have been refused. 0 = off.
+  learn-hours: 0
+
   # Block addresses that reach the required score for proxy, VPN or anonymising traffic.
   block-proxy: true
 

@@ -273,6 +273,7 @@ public final class ShieldConfig {
       this.bypassPermission = node.getString("settings.bypass-permission", "proxyshield.bypass");
 
       this.dryRun = node.getBoolean("detection.dry-run", false);
+      this.learnHours = clamp(node.getInt("detection.learn-hours", 0), 0, 720);
       this.blockProxy = node.getBoolean("detection.block-proxy", true);
       this.blockHosting = node.getBoolean("detection.block-hosting", true);
       this.useLists = node.getBoolean("detection.use-lists", true);
@@ -811,6 +812,12 @@ public final class ShieldConfig {
 
    public String bypassPermission() {
       return bypassPermission;
+   }
+
+   private final int learnHours;
+
+   public int learnHours() {
+      return learnHours;
    }
 
    public boolean dryRun() {

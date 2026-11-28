@@ -217,7 +217,7 @@ public final class CommandHandler {
             "version", core.platform().version(),
             "platform", core.platform().name(),
             "locale", m.locale()));
-      send(sender, config.dryRun() ? "info-mode-dry-run" : "info-mode-enforcing");
+      send(sender, core.dryRunNow(config) ? "info-mode-dry-run" : "info-mode-enforcing");
       send(sender, "info-alerts", of(
             "silent", m.get(config.silent() ? "silent-mode" : "broadcast-mode"),
             "webhook", onOff(config.discordUsable()),

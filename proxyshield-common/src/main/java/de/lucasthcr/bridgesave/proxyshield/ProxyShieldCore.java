@@ -344,7 +344,7 @@ public final class ProxyShieldCore {
             continue;
          }
 
-         boolean enforced = verdict.blocked() && !current.dryRun();
+         boolean enforced = verdict.blocked() && !dryRunNow(current);
          statistics.record(verdict, enforced);
 
          if (verdict.blocked()) {
@@ -497,7 +497,7 @@ public final class ProxyShieldCore {
                "internal error", LookupResult.UNKNOWN);
       }
 
-      boolean enforced = verdict.blocked() && !current.dryRun();
+      boolean enforced = verdict.blocked() && !dryRunNow(current);
       statistics.record(verdict, enforced);
       // On a proxy the player can instead be fenced into the allowed backends.
       boolean fenced = enforced && uuid != null && platform.proxy()
@@ -594,6 +594,40 @@ public final class ProxyShieldCore {
       }
       return kick;
    }
+
+   // Dry-Run von Hand oder Lernphase nach der Installation
+   public boolean dryRunNow(ShieldConfig current) {
+      return current.dryRun() || learning(current);
+   }
+
+   private boolean learning(ShieldConfig current) {
+      if (current.learnHours() <= 0) {
+         return false;
+      }
+      java.nio.file.Path stamp = platform.dataFolder().resolve("learning-since");
+      try {
+         // Startzeit nur einmal lesen, nicht bei jedem Join
+         if (learningSince == 0L) {
+            if (!java.nio.file.Files.exists(stamp)) {
+               java.nio.file.Files.writeString(stamp, String.valueOf(System.currentTimeMillis()));
+            }
+            learningSince = Long.parseLong(java.nio.file.Files.readString(stamp).trim());
+         }
+         long since = learningSince;
+         boolean active = System.currentTimeMillis() - since < current.learnHours() * 3_600_000L;
+         if (!active && !learningReported) {
+            learningReported = true;
+            platform.info("Learning phase over: " + statistics.wouldHaveBlocked()
+                  + " join(s) since the last start would have been refused. Refusing from now on.");
+         }
+         return active;
+      } catch (java.io.IOException | NumberFormatException broken) {
+         return false;
+      }
+   }
+
+   private volatile boolean learningReported;
+   private volatile long learningSince;
 
    /** Codes of refused players, for /proxyshield allow. */
    public AppealStore appeals() {
