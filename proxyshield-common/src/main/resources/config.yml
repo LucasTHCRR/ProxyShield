@@ -830,6 +830,9 @@ discord:
   # Must start with https://
   webhook-url: ""
 
+  # Once a week: how many joins were checked and refused, and which providers failed.
+  weekly-report: true
+
   # Set to false to print "hidden" instead of the address.
   show-ip: true
 

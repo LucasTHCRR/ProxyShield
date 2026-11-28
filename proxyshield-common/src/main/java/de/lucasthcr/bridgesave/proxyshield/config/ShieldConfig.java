@@ -429,6 +429,7 @@ public final class ShieldConfig {
       this.flagCommandTrigger = ActionTrigger.parse(node.getString("actions.run-when", "always"));
 
       this.discordEnabled = node.getBoolean("discord.enabled", false);
+      this.weeklyReport = node.getBoolean("discord.weekly-report", true);
       this.webhookUrl = node.getString("discord.webhook-url", "");
       this.discordShowIp = node.getBoolean("discord.show-ip", true);
       this.discordUsername = node.getString("discord.username", "ProxyShield");
@@ -1312,6 +1313,12 @@ public final class ShieldConfig {
 
    public boolean logToFile() {
       return logToFile;
+   }
+
+   private final boolean weeklyReport;
+
+   public boolean weeklyReport() {
+      return weeklyReport;
    }
 
    public boolean discordEnabled() {

@@ -76,6 +76,7 @@ public final class ProxyShieldCore {
    private volatile AppealStore appeals = new AppealStore(180L * 60_000L);
    private final ManagedIpList blacklist;
    private final Statistics statistics = new Statistics();
+   private de.lucasthcr.bridgesave.proxyshield.notify.WeeklyReport weekly;
    private final JoinHeuristics heuristics = new JoinHeuristics();
    private final ConnectionLimiter limiter = new ConnectionLimiter();
    private final AltTracker alts;
@@ -105,6 +106,8 @@ public final class ProxyShieldCore {
       this.whitelist = new ManagedIpList(platform.dataFolder().resolve("whitelist.txt"));
       this.blacklist = new ManagedIpList(platform.dataFolder().resolve("blacklist.txt"));
       this.alts = new AltTracker(platform.dataFolder().resolve("alts.tsv"));
+      this.weekly = new de.lucasthcr.bridgesave.proxyshield.notify.WeeklyReport(
+            platform.dataFolder().resolve("weekly-report.properties"));
       this.asnFeed = new AsnFeed(platform);
       this.networks = new NetworkData(platform);
       this.intel = new IntelDatabase(platform);
@@ -363,6 +366,16 @@ public final class ProxyShieldCore {
       }
 
       ShieldConfig current = config;
+      weekly.add(statistics.checked(), statistics.blocked());
+      if (current.discordUsable() && current.weeklyReport() && weekly.due()) {
+         java.util.List<String> failing = new java.util.ArrayList<>();
+         for (var provider : lookups.providers()) {
+            if (provider.failureCount() > 0) {
+               failing.add(provider.id() + " (" + provider.failureCount() + ")");
+            }
+         }
+         weekly.send(current.webhookUrl(), platform.version(), failing);
+      }
       long dueAfter = current.listUpdateIntervalHours() * 3_600_000L;
       long lastRefresh = lists.lastRefreshMillis();
       if (lastRefresh == 0L || System.currentTimeMillis() - lastRefresh >= dueAfter) {
