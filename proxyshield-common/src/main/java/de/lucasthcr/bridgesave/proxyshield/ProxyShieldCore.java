@@ -566,10 +566,13 @@ public final class ProxyShieldCore {
       Map<String, String> values = new LinkedHashMap<>();
       values.put("player", player == null ? "unknown" : player);
       values.put("ip", ip == null ? "unknown" : ip);
-      values.put("reason", verdict.describe());
       values.put("country", verdict.lookup().countryOrUnknown());
       values.put("isp", verdict.lookup().ispOrUnknown());
       values.put("asn", verdict.lookup().asnOrUnknown());
+      // Klartext fuer den Spieler, die technische Fassung bleibt als {detail}
+      values.put("detail", verdict.describe());
+      String key = "reason-" + verdict.reason().name().toLowerCase(Locale.ROOT);
+      values.put("reason", messages.has(key) ? messages.get(key, values).replace(" (unknown)", "") : verdict.describe());
       String kick = messages.get("kick-message", values);
       if (config.appealEnabled() && ip != null && verdict.reason() != CheckVerdict.Reason.BLACKLISTED
             && verdict.reason() != CheckVerdict.Reason.BOGON) {

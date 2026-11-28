@@ -92,6 +92,10 @@ public final class Messages {
    }
 
    /** Raw text for a key, with {@code {prefix}} already substituted. */
+   public boolean has(String key) {
+      return values.containsKey(key) || DEFAULTS.containsKey(key);
+   }
+
    public String get(String key) {
       return get(key, Map.of());
    }
@@ -271,6 +275,14 @@ public final class Messages {
       m.put("ping-header", "&8&m----&r &bProvider ping &8&m----");
       m.put("ping-ok", "&7» &f{provider} &8({host})&7: &a{ms} ms");
       m.put("ping-failed", "&7» &f{provider} &8({host})&7: &cfailed &8({reason})");
+      m.put("reason-hosting", "datacenter network ({isp})");
+      m.put("reason-proxy", "VPN or proxy ({isp})");
+      m.put("reason-ip_list", "known VPN or datacenter address");
+      m.put("reason-tor", "Tor network");
+      m.put("reason-asn", "blocked network ({isp})");
+      m.put("reason-suspicious", "suspicious connection");
+      m.put("reason-country", "your country ({country}) is not allowed here");
+      m.put("reason-lookup_failed", "the check could not be completed, try again in a minute");
       m.put("doctor-header", "&8&m----&r &bProxyShield doctor &8&m----");
       m.put("doctor-intel-off", "&e! &7PaperStream Intel database is switched off (detection.intel.enabled).");
       m.put("doctor-intel-missing", "&c✖ &7PaperStream Intel database is not loaded yet. Run &f/proxyshield refresh&7.");
