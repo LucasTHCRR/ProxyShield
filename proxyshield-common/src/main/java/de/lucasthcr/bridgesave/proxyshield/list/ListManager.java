@@ -145,10 +145,11 @@ public final class ListManager {
          // Alle Quellen im Cache: der Stand zaehlt als letzter Download, der Takt entscheidet
          if (restored == sources.size()) {
             lastRefreshMillis = oldest;
+            lastSourceCount = restored;
          }
          // Schutz steht ab hier, der Download frischt nur auf
          platform.info("VPN lists ready from cache: " + ranges.rangeCount() + " ranges from " + restored
-               + " cached list(s), a fresh download follows.");
+               + " cached list(s).");
       }
    }
 

@@ -936,6 +936,9 @@ public final class CommandHandler {
          for (IpLookupService provider : providers) {
             if (provider.tripped()) {
                tripped.add(provider.id());
+            } else if (provider.failureCount() >= 3 && provider.failureCount() >= provider.queryCount()) {
+               // Nie pausiert, aber fast jede Abfrage scheitert (z. B. Umleitung)
+               tripped.add(provider.id() + " (" + provider.failureCount() + " failures)");
             }
          }
          if (providers.isEmpty()) {

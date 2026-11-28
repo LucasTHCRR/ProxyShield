@@ -115,8 +115,9 @@ public final class ProviderCatalog {
       // install is unaffected and an unkeyed one still contributes the country, the ISP and the
       // network instead of failing outright. It cannot contribute a VPN verdict either way, which
       // is what warnIfVerdictless reports at start-up.
+      // Ohne Schluessel liefert ipapi.is keine Proxy- oder Hosting-Felder mehr
       put(catalog, ProviderDefinition.builder("ipapi-is", "https://api.ipapi.is/?q={ip}&key={key}")
-            .optionalKey()
+            .urlKey()
             .proxy("is_proxy", "is_vpn", "is_tor", "is_abuser")
             .hosting("is_datacenter")
             .tor("is_tor")
@@ -144,10 +145,12 @@ public final class ProviderCatalog {
             .rateLimit(60)
             .build());
 
-      put(catalog, ProviderDefinition.builder("freeipapi", "https://freeipapi.com/api/json/{ip}")
+      put(catalog, ProviderDefinition.builder("freeipapi", "https://free.freeipapi.com/api/v1/json/{ip}")
             .proxy("isProxy")
             .country("countryCode")
             .countryName("countryName")
+            .isp("asnOrganization")
+            .asn("asn")
             .weight(1.0)
             .rateLimit(60)
             .build());

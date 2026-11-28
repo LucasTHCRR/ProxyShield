@@ -277,7 +277,7 @@ public final class Messages {
       m.put("ping-failed", "&7» &f{provider} &8({host})&7: &cfailed &8({reason})");
       m.put("reason-hosting", "datacenter network ({isp})");
       m.put("reason-proxy", "VPN or proxy ({isp})");
-      m.put("reason-ip_list", "known VPN or datacenter address");
+      m.put("reason-ip_list", "known VPN, proxy, Tor or datacenter address");
       m.put("reason-tor", "Tor network");
       m.put("reason-asn", "blocked network ({isp})");
       m.put("reason-suspicious", "suspicious connection");
